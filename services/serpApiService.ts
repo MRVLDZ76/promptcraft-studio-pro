@@ -4,6 +4,7 @@
 const USE_PROXY = import.meta.env.VITE_USE_API_ENDPOINT === 'true';
 const PROXY_URL = import.meta.env.VITE_API_BASE_URL || 'https://uuohwxcuqnaykpjhrcvu.supabase.co/functions/v1';
 const SERPAPI_KEY = import.meta.env.VITE_SERPAPI_KEY || '8497ce60ccb34a61b7bb371343928ddf60dfa38ce0133f9810e06c7cf9f74cd8';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const SERPAPI_ENDPOINT = 'https://serpapi.com/search.json';
 
 // Helper function to call SerpAPI via proxy or directly
@@ -14,12 +15,15 @@ async function callSerpAPI(engine: string, params: Record<string, any>): Promise
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({ engine, params })
     });
 
     if (!response.ok) {
-      throw new Error(`Proxy request failed: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`Proxy request failed: ${response.status} - ${errorText}`);
     }
 
     return response.json();
