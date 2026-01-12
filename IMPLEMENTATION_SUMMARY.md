@@ -71,7 +71,7 @@ Your AI Arbiter application now has a **100% JavaScript production-ready archite
 ```typescript
 // DEPLOYMENT MODE: Toggle between client-side (dev) and server-side (prod)
 const USE_API_ENDPOINT = import.meta.env.VITE_USE_API_ENDPOINT === 'true';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://your-project.vercel.app';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://promptcraft-studio-pro.vercel.app';
 
 if (USE_API_ENDPOINT) {
   // Production: Call backend API

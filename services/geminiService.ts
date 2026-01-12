@@ -3,7 +3,7 @@ import { PromptState, SequenceSegment, AnalysisMode, Participant } from '../type
 
 // DEPLOYMENT MODE: Toggle between client-side (dev) and server-side (prod)
 const USE_API_ENDPOINT = import.meta.env.VITE_USE_API_ENDPOINT === 'true';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://your-project.vercel.app';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://promptcraft-studio-pro.vercel.app';
 
 export const analyzeVideoContent = async (
   base64Video: string | null, 
@@ -18,6 +18,7 @@ export const analyzeVideoContent = async (
     domain?: string,
     contextFiles?: string[],
     youtubeUrl?: string,
+    transcript?: string,
     ragUrls?: string[],
     supervisorPrompt?: string,
     calibration: {
@@ -44,6 +45,7 @@ export const analyzeVideoContent = async (
         body: JSON.stringify({
           video: base64Video,
           videoMime: mimeType,
+          transcript: config.transcript,
           prompt: userPrompt,
           ragUrls: config.ragUrls || [],
           wsdcWeights: config.wsdcWeights,
@@ -237,9 +239,21 @@ export const analyzeVideoContent = async (
   `;
 
   const contents: any = { parts: [] };
-  if (base64Video) {
+  
+  // Use transcript if available (much cheaper than video processing)
+  if (config.transcript) {
+    const transcriptContext = `
+      VIDEO TRANSCRIPT (YouTube Auto-Generated):
+      ${config.transcript}
+      
+      Note: This is the full transcript of the video. Analyze the arguments based on the text content.
+    `;
+    contents.parts.push({ text: transcriptContext });
+  } else if (base64Video) {
+    // Fallback to video if no transcript
     contents.parts.push({ inlineData: { data: base64Video, mimeType: mimeType } });
   }
+  
   contents.parts.push({ text: finalPrompt });
 
   const response = await ai.models.generateContent({

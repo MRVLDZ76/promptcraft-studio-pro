@@ -47,7 +47,16 @@ const App: React.FC = () => {
     }
     const savedChars = localStorage.getItem('ps_chars_v4');
     if (savedChars) setCharacters(JSON.parse(savedChars));
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) setIsDark(true);
+    
+    // Load theme preference from localStorage or system preference
+    const savedTheme = localStorage.getItem('theme_preference');
+    if (savedTheme === 'dark') {
+      setIsDark(true);
+    } else if (savedTheme === 'light') {
+      setIsDark(false);
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setIsDark(true);
+    }
 
     const checkKey = async () => {
       // @ts-ignore
@@ -72,6 +81,7 @@ const App: React.FC = () => {
 
   React.useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark);
+    localStorage.setItem('theme_preference', isDark ? 'dark' : 'light');
   }, [isDark]);
 
   const handleOpenKeySelector = async () => {

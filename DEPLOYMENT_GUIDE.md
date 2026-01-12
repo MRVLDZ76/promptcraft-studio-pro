@@ -100,7 +100,7 @@ NODE_ENV=production
 ```env
 # Production mode (backend API calls)
 VITE_USE_API_ENDPOINT=true
-VITE_API_BASE_URL=https://your-project.vercel.app
+VITE_API_BASE_URL=https://promptcraft-studio-pro.vercel.app
 ```
 
 ### Step 3: Test API Locally
@@ -163,7 +163,7 @@ curl -X POST http://localhost:3000/api/analyze `
 4. Vercel auto-detects Vite config
 5. Add environment variables in dashboard
 6. Click "Deploy"
-7. Get deployment URL: `https://your-project.vercel.app`
+7. Get deployment URL: `https://promptcraft-studio-pro.vercel.app`
 
 #### Option B: Vercel CLI
 ```powershell
@@ -624,7 +624,7 @@ console.log({
 3. **Update frontend config:**
    ```env
    VITE_USE_API_ENDPOINT=true
-   VITE_API_BASE_URL=https://your-project.vercel.app
+   VITE_API_BASE_URL=https://promptcraft-studio-pro.vercel.app
    ```
 
 4. **Rebuild and redeploy frontend:**

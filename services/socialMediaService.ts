@@ -3,6 +3,8 @@
  * Fetches creator data from YouTube and Instagram APIs
  */
 
+import { getChannelDetails, ChannelDetails } from './serpApiService';
+
 export interface CreatorProfile {
   platform: 'youtube' | 'instagram';
   username: string;
@@ -17,28 +19,6 @@ export interface CreatorProfile {
   engagement?: string;
 }
 
-export interface YouTubeChannelData {
-  id: string;
-  snippet: {
-    title: string;
-    description: string;
-    thumbnails: {
-      high: { url: string };
-    };
-    customUrl?: string;
-  };
-  statistics: {
-    subscriberCount: string;
-    videoCount: string;
-    viewCount: string;
-  };
-  brandingSettings?: {
-    channel: {
-      description: string;
-    };
-  };
-}
-
 export interface InstagramProfileData {
   username: string;
   full_name: string;
@@ -51,61 +31,38 @@ export interface InstagramProfileData {
 }
 
 /**
- * Fetch YouTube channel data
+ * Fetch YouTube channel data using SerpAPI (no YouTube API key needed)
  * @param channelId - YouTube channel ID or handle (e.g., @username)
- * @param apiKey - Google API key
  */
 export async function fetchYouTubeProfile(
-  channelId: string,
-  apiKey: string
+  channelId: string
 ): Promise<CreatorProfile | null> {
   try {
     // Clean the channel ID (remove @ if present)
-    const cleanId = channelId.replace('@', '');
+    const cleanId = channelId.replace('@', '').trim();
     
-    // First, try to get channel by handle/username
-    let endpoint = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,brandingSettings&forHandle=${cleanId}&key=${apiKey}`;
-    
-    let response = await fetch(endpoint);
-    let data = await response.json();
-    
-    // If not found by handle, try by channel ID
-    if (!data.items || data.items.length === 0) {
-      endpoint = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,brandingSettings&id=${cleanId}&key=${apiKey}`;
-      response = await fetch(endpoint);
-      data = await response.json();
-    }
-
-    if (!data.items || data.items.length === 0) {
-      console.error('YouTube channel not found');
-      return null;
-    }
-
-    const channel: YouTubeChannelData = data.items[0];
-    const stats = channel.statistics;
+    // Use SerpAPI to fetch channel details
+    const channelData = await getChannelDetails(cleanId);
 
     // Format subscriber count
-    const subCount = parseInt(stats.subscriberCount);
-    const formattedSubs = formatNumber(subCount);
+    const formattedSubs = channelData.subscribersText || formatNumber(channelData.subscribers);
 
     // Format view count
-    const viewCount = parseInt(stats.viewCount);
-    const formattedViews = formatNumber(viewCount);
+    const formattedViews = channelData.totalViews ? formatNumber(channelData.totalViews) : undefined;
 
     return {
       platform: 'youtube',
-      username: channel.snippet.customUrl || `@${cleanId}`,
-      displayName: channel.snippet.title,
-      thumbnail: channel.snippet.thumbnails.high.url,
+      username: channelData.handle || `@${cleanId}`,
+      displayName: channelData.title,
+      thumbnail: channelData.thumbnail,
       followers: formattedSubs,
-      verified: true, // YouTube API doesn't provide this directly
-      description: channel.snippet.description.substring(0, 200),
-      totalVideos: parseInt(stats.videoCount),
+      verified: channelData.verified,
+      description: channelData.description,
+      totalVideos: channelData.totalVideos,
       totalViews: formattedViews,
-      engagement: calculateEngagement(viewCount, subCount),
     };
   } catch (error) {
-    console.error('Error fetching YouTube profile:', error);
+    console.error('Error fetching YouTube profile via SerpAPI:', error);
     return null;
   }
 }

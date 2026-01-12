@@ -1,6 +1,9 @@
 import React from 'react';
 import { analyzeVideoContent } from '../services/geminiService';
 import { fetchYouTubeProfile, fetchInstagramProfile, detectPlatform, extractUsername, CreatorProfile } from '../services/socialMediaService';
+import { VideoSearchModal } from './VideoSearchModal';
+import { ChannelVideoSelector } from './ChannelVideoSelector';
+import { YouTubeVideoResult, getVideoTranscriptWithFallback, TranscriptData, extractYouTubeVideoId } from '../services/serpApiService';
 import { AnalysisMode, Participant } from '../types';
 import { 
   Settings2, 
@@ -33,7 +36,8 @@ import {
   Eye,
   Play,
   Download,
-  Trash2
+  Trash2,
+  Search
 } from 'lucide-react';
 
 const COUNTRIES = ['Global', 'USA', 'China', 'EU', 'UK', 'India', 'Japan', 'Brazil', 'Spain', 'Mexico'];
@@ -116,6 +120,20 @@ export const AnalysisStudio: React.FC = () => {
   
   // Visual Display Mode
   const [visualMode, setVisualMode] = React.useState(true);
+  
+  // Video Search Modal State
+  const [showVideoSearch, setShowVideoSearch] = React.useState(false);
+  
+  // Channel Video Selector State
+  const [showChannelVideoSelector, setShowChannelVideoSelector] = React.useState(false);
+  const [selectedChannelHandle, setSelectedChannelHandle] = React.useState('');
+  const [selectedChannelName, setSelectedChannelName] = React.useState('');
+  const [currentParticipant, setCurrentParticipant] = React.useState<'A' | 'B'>('A');
+  
+  // Transcript State
+  const [transcript, setTranscript] = React.useState<string>('');
+  const [loadingTranscript, setLoadingTranscript] = React.useState(false);
+  const [transcriptError, setTranscriptError] = React.useState<string>('');
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const contextInputRef = React.useRef<HTMLInputElement>(null);
@@ -176,6 +194,64 @@ export const AnalysisStudio: React.FC = () => {
     }
   };
 
+  const handleVideoSelect = async (selectedVideo: YouTubeVideoResult) => {
+    // Set video URL from YouTube
+    setVideo(`https://www.youtube.com/watch?v=${selectedVideo.video_id}`);
+    setVideoMime('video/youtube');
+    
+    // Auto-fill participant data from channel info
+    setPA({
+      ...pA,
+      name: selectedVideo.channel.name,
+      socialUrl: selectedVideo.channel.link,
+      thumbnail: selectedVideo.channel.thumbnail
+    });
+    
+    setShowVideoSearch(false);
+    
+    // Fetch transcript automatically
+    setLoadingTranscript(true);
+    setTranscriptError('');
+    try {
+      const transcriptData = await getVideoTranscriptWithFallback(selectedVideo.video_id);
+      setTranscript(transcriptData.full_transcript);
+      console.log('✅ Transcript loaded:', transcriptData.full_transcript.length, 'characters');
+    } catch (error: any) {
+      console.error('❌ Transcript fetch failed:', error);
+      setTranscriptError(error.message || 'Failed to load transcript');
+      setTranscript('');
+    } finally {
+      setLoadingTranscript(false);
+    }
+  };
+
+  const handleChannelVideoSelect = async (video: YouTubeVideoResult, transcriptData: TranscriptData) => {
+    // Set video URL
+    setVideo(`https://www.youtube.com/watch?v=${video.video_id}`);
+    setVideoMime('video/youtube');
+    
+    // Format transcript
+    const formattedTranscript = transcriptData.transcript
+      .map(snippet => snippet.text)
+      .join(' ');
+    
+    setTranscript(formattedTranscript);
+    console.log('✅ Transcript loaded from channel selector:', formattedTranscript.length, 'characters');
+    
+    // Update the appropriate participant
+    const setParticipant = currentParticipant === 'A' ? setPA : setPB;
+    const participant = currentParticipant === 'A' ? pA : pB;
+    
+    setParticipant({
+      ...participant,
+      name: video.channel.name,
+      socialUrl: video.channel.link,
+      thumbnail: video.channel.thumbnail
+    });
+    
+    setShowChannelVideoSelector(false);
+  };
+
   const handleContextUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
@@ -219,12 +295,16 @@ export const AnalysisStudio: React.FC = () => {
       let profile: CreatorProfile | null = null;
 
       if (platform === 'youtube' || socialUrl.includes('youtube') || socialUrl.startsWith('@')) {
-        // Get API key from env (defined in vite.config.ts)
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-          throw new Error('API key not found. Please set GEMINI_API_KEY in .env.local');
+        // Using SerpAPI - no YouTube API key needed
+        profile = await fetchYouTubeProfile(username);
+        
+        if (profile) {
+          // Open video selector to choose which video to analyze
+          setSelectedChannelHandle(username);
+          setSelectedChannelName(profile.displayName);
+          setCurrentParticipant(isParticipantA ? 'A' : 'B');
+          setShowChannelVideoSelector(true);
         }
-        profile = await fetchYouTubeProfile(username, apiKey);
       } else if (platform === 'instagram') {
         profile = await fetchInstagramProfile(username);
       }
@@ -370,6 +450,7 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
         wsdcWeights,
         ragUrls: ragUrls.split('\n').filter(Boolean),
         contextFiles,
+        transcript: transcript || undefined,
         systemInstruction: enhancedSystemInstruction,
         supervisorPrompt,
         calibration: { country, year, demography, persona, logicStyle, stakeholderMode, marginOfError }
@@ -433,8 +514,8 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                <div className="flex flex-col items-center">
                   <span className="text-[8px] font-black text-slate-400 dark:text-indigo-400 uppercase tracking-widest mb-1 block">System Mode</span>
                   <div className="flex bg-slate-50 dark:bg-slate-800 rounded-md p-0.5 border border-slate-200 dark:border-indigo-500/20">
-                    <button onClick={() => setAnalysisMode(AnalysisMode.ARENA)} className={`px-2.5 py-1 rounded text-[8px] font-black uppercase transition-all ${analysisMode === AnalysisMode.ARENA ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 dark:text-slate-500'}`}>1v1 Arena</button>
-                    <button onClick={() => setAnalysisMode(AnalysisMode.MONOLOGUE)} className={`px-2.5 py-1 rounded text-[8px] font-black uppercase transition-all ${analysisMode === AnalysisMode.MONOLOGUE ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 dark:text-slate-500'}`}>Solo Audit</button>
+                    <button onClick={() => { setAnalysisMode(AnalysisMode.ARENA); setSystemMode('arena'); }} className={`px-2.5 py-1 rounded text-[8px] font-black uppercase transition-all ${analysisMode === AnalysisMode.ARENA ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 dark:text-slate-500'}`}>1v1 Arena</button>
+                    <button onClick={() => { setAnalysisMode(AnalysisMode.MONOLOGUE); setSystemMode('solo'); }} className={`px-2.5 py-1 rounded text-[8px] font-black uppercase transition-all ${analysisMode === AnalysisMode.MONOLOGUE ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 dark:text-slate-500'}`}>Solo Audit</button>
                   </div>
                </div>
             </div>
@@ -736,7 +817,7 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                <label className="text-[8px] font-black text-slate-400 dark:text-slate-600 uppercase">System Mode</label>
                <div className="flex gap-2">
                  <button
-                   onClick={() => setSystemMode('arena')}
+                   onClick={() => { setSystemMode('arena'); setAnalysisMode(AnalysisMode.ARENA); }}
                    className={`flex-1 px-3 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${
                      systemMode === 'arena'
                        ? 'bg-gradient-to-r from-indigo-500 to-cyan-500 text-white shadow-lg'
@@ -747,7 +828,7 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                    Arena (Debate)
                  </button>
                  <button
-                   onClick={() => setSystemMode('solo')}
+                   onClick={() => { setSystemMode('solo'); setAnalysisMode(AnalysisMode.MONOLOGUE); }}
                    className={`flex-1 px-3 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${
                      systemMode === 'solo'
                        ? 'bg-gradient-to-r from-indigo-500 to-cyan-500 text-white shadow-lg'
@@ -1017,12 +1098,72 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                     <div className="space-y-3">
                        <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2"><Monitor className="w-3 h-3" /> Input Stream</h4>
-                       <div onClick={() => fileInputRef.current?.click()} className="aspect-video bg-slate-50 dark:bg-black/40 rounded-2xl border border-slate-200 dark:border-indigo-500/20 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-500/50 transition-all overflow-hidden relative shadow-inner group">
-                         {video ? <video src={video} className="w-full h-full object-contain" controls /> : (
-                           <><div className="w-12 h-12 bg-white dark:bg-white/5 rounded-full flex items-center justify-center mb-2 shadow-sm dark:shadow-none group-hover:scale-110 transition-transform"><History className="w-5 h-5 text-indigo-500" /></div><p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Neural Simulation Idle</p></>
+                       <div className="aspect-video bg-slate-50 dark:bg-black/40 rounded-2xl border border-slate-200 dark:border-indigo-500/20 flex flex-col items-center justify-center overflow-hidden relative shadow-inner group">
+                         {video ? (
+                           videoMime === 'video/youtube' ? (
+                             <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-4">
+                               <Play className="w-12 h-12 text-indigo-500" />
+                               <div className="text-center">
+                                 <p className="text-[10px] font-black text-slate-600 dark:text-slate-300 mb-1">YouTube Video Selected</p>
+                                 <p className="text-[8px] font-medium text-slate-400 dark:text-slate-600 truncate max-w-xs">{video}</p>
+                               </div>
+                             </div>
+                           ) : (
+                             <video src={video} className="w-full h-full object-contain" controls />
+                           )
+                         ) : (
+                           <>
+                             <div className="w-12 h-12 bg-white dark:bg-white/5 rounded-full flex items-center justify-center mb-2 shadow-sm dark:shadow-none group-hover:scale-110 transition-transform">
+                               <History className="w-5 h-5 text-indigo-500" />
+                             </div>
+                             <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Neural Simulation Idle</p>
+                             <p className="text-[8px] font-medium text-slate-400 dark:text-slate-600 mt-1">Search or upload video</p>
+                           </>
                          )}
                          <input ref={fileInputRef} type="file" className="hidden" accept="video/*" onChange={handleVideoUpload} />
                        </div>
+                       
+                       {/* Transcript Status */}
+                       {videoMime === 'video/youtube' && (
+                         <div className="bg-gradient-to-r from-indigo-50 to-cyan-50 dark:from-indigo-500/10 dark:to-cyan-500/10 rounded-xl p-3 border border-indigo-100 dark:border-indigo-500/20">
+                           <div className="flex items-center justify-between mb-2">
+                             <span className="text-[9px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                               <FileText className="w-3 h-3 text-indigo-500" />
+                               Transcript Status
+                             </span>
+                             {transcript && (
+                               <span className="text-[8px] font-bold text-indigo-600 dark:text-indigo-400">
+                                 {Math.round(transcript.length / 1000)}K chars
+                               </span>
+                             )}
+                           </div>
+                           {loadingTranscript ? (
+                             <div className="flex items-center gap-2 text-[8px] text-slate-500 dark:text-slate-400">
+                               <Loader2 className="w-3 h-3 animate-spin" />
+                               Fetching transcript...
+                             </div>
+                           ) : transcriptError ? (
+                             <div className="flex items-center gap-2 text-[8px] text-red-500">
+                               <AlertCircle className="w-3 h-3" />
+                               {transcriptError}
+                             </div>
+                           ) : transcript ? (
+                             <div className="space-y-2">
+                               <div className="flex items-center gap-2 text-[8px] text-green-600 dark:text-green-400 font-bold">
+                                 <Verified className="w-3 h-3" />
+                                 Ready • 99% cost savings vs video
+                               </div>
+                               <div className="max-h-20 overflow-y-auto text-[7px] text-slate-600 dark:text-slate-400 leading-relaxed bg-white dark:bg-black/20 rounded p-2 border border-slate-200 dark:border-slate-700">
+                                 {transcript.substring(0, 300)}...
+                               </div>
+                             </div>
+                           ) : (
+                             <div className="text-[8px] text-slate-400 dark:text-slate-600">
+                               No transcript loaded
+                             </div>
+                           )}
+                         </div>
+                       )}
                     </div>
                     <div className="flex flex-col gap-3">
                        <div className="flex items-center justify-between">
@@ -1495,6 +1636,27 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
           75% { transform: translateX(5px); }
         }
       `}</style>
+
+      {/* Video Search Modal */}
+      {showVideoSearch && (
+        <VideoSearchModal
+          isOpen={showVideoSearch}
+          onClose={() => setShowVideoSearch(false)}
+          onSelectVideo={handleVideoSelect}
+          participantLabel="Participant A"
+        />
+      )}
+
+      {/* Channel Video Selector Modal */}
+      {showChannelVideoSelector && (
+        <ChannelVideoSelector
+          isOpen={showChannelVideoSelector}
+          onClose={() => setShowChannelVideoSelector(false)}
+          channelHandle={selectedChannelHandle}
+          channelName={selectedChannelName}
+          onSelectVideo={handleChannelVideoSelect}
+        />
+      )}
     </div>
   );
 };

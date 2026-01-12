@@ -142,7 +142,7 @@ vercel --prod
 
 # Update frontend (.env.production):
 # - VITE_USE_API_ENDPOINT=true
-# - VITE_API_BASE_URL=https://your-project.vercel.app
+# - VITE_API_BASE_URL=https://promptcraft-studio-pro.vercel.app
 
 # Rebuild and redeploy
 npm run build
