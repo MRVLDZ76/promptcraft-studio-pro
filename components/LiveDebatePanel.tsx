@@ -760,7 +760,7 @@ export const LiveDebatePanel: React.FC<LiveDebatePanelProps> = ({
         </div>
       </div>
 
-      {/* Session Ended: Show Analysis Prompt */}
+      {/* Session Ended: Show Analysis Prompts */}
       {session.state === 'ended' && (
         <div className="px-6 pb-6">
           <div className="bg-green-500/20 rounded-xl p-6 border border-green-500/30 text-center">
