@@ -23,6 +23,8 @@ Deno.serve(async (req) => {
   try {
     const { engine, params } = await req.json();
 
+    console.log('SerpAPI Request:', { engine, params });
+
     // Build query parameters
     const searchParams = new URLSearchParams({
       engine: engine || 'youtube',
@@ -30,14 +32,20 @@ Deno.serve(async (req) => {
       ...params
     });
 
+    const apiUrl = `${SERPAPI_ENDPOINT}?${searchParams.toString()}`;
+    console.log('Calling SerpAPI:', apiUrl.replace(SERPAPI_KEY, 'API_KEY_HIDDEN'));
+
     // Make request to SerpAPI
-    const response = await fetch(`${SERPAPI_ENDPOINT}?${searchParams.toString()}`);
+    const response = await fetch(apiUrl);
     
     if (!response.ok) {
-      throw new Error(`SerpAPI request failed: ${response.status}`);
+      const errorText = await response.text();
+      console.error('SerpAPI error response:', response.status, errorText);
+      throw new Error(`SerpAPI request failed: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
+    console.log('SerpAPI success:', { engine, status: data.search_metadata?.status });
 
     return new Response(
       JSON.stringify(data),
@@ -52,7 +60,10 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('SerpAPI Proxy Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message || 'Unknown error',
+        details: String(error)
+      }),
       {
         headers: {
           ...corsHeaders,

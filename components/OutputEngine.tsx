@@ -48,20 +48,20 @@ export const OutputEngine: React.FC<Props> = ({
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group dark:bg-slate-900 dark:border-slate-800">
-        <div className="border-b border-slate-100 bg-slate-50 px-4 py-2 flex justify-between items-center dark:bg-slate-800 dark:border-slate-700">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Final Prompt</span>
+      <div className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden group dark:bg-neutral-900 dark:border-neutral-800">
+        <div className="border-b border-neutral-100 bg-neutral-50 px-4 py-2 flex justify-between items-center dark:bg-neutral-800 dark:border-neutral-700">
+          <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Final Prompt</span>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-slate-400 mr-2">{prompt.length} chars</span>
-            <div className="flex items-center bg-slate-100 rounded-md p-0.5 dark:bg-slate-700/50">
+            <span className="text-[10px] font-mono text-neutral-400 mr-2">{prompt.length} chars</span>
+            <div className="flex items-center bg-neutral-100 rounded-md p-0.5 dark:bg-neutral-700/50">
               <button 
                 onClick={onUndo} 
                 disabled={!canUndo} 
                 title="Undo"
                 className={`p-1.5 rounded-md transition-all ${
                   canUndo 
-                    ? 'text-slate-600 hover:text-indigo-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-600' 
-                    : 'text-slate-300 cursor-not-allowed dark:text-slate-600'
+                    ? 'text-neutral-600 hover:text-neutral-600 hover:bg-white dark:text-neutral-300 dark:hover:bg-neutral-600' 
+                    : 'text-neutral-300 cursor-not-allowed dark:text-neutral-600'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -72,14 +72,14 @@ export const OutputEngine: React.FC<Props> = ({
                 title="Redo"
                 className={`p-1.5 rounded-md transition-all ${
                   canRedo 
-                    ? 'text-slate-600 hover:text-indigo-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-600' 
-                    : 'text-slate-300 cursor-not-allowed dark:text-slate-600'
+                    ? 'text-neutral-600 hover:text-neutral-600 hover:bg-white dark:text-neutral-300 dark:hover:bg-neutral-600' 
+                    : 'text-neutral-300 cursor-not-allowed dark:text-neutral-600'
                 }`}
               >
                 <RotateCw className="w-3.5 h-3.5" />
               </button>
             </div>
-            <button onClick={handleCopy} className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors ml-1">
+            <button onClick={handleCopy} className="p-1.5 text-neutral-400 hover:text-neutral-600 transition-colors ml-1">
               {copying ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
           </div>
@@ -87,7 +87,7 @@ export const OutputEngine: React.FC<Props> = ({
         <textarea 
           readOnly 
           value={prompt}
-          className="w-full h-40 p-5 text-sm text-slate-700 font-mono resize-none focus:outline-none bg-transparent dark:text-slate-300" 
+          className="w-full h-40 p-5 text-sm text-neutral-700 font-mono resize-none focus:outline-none bg-transparent dark:text-neutral-300" 
         />
       </div>
 
@@ -95,7 +95,7 @@ export const OutputEngine: React.FC<Props> = ({
         <button 
           onClick={onPolish}
           disabled={loading}
-          className="flex-1 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 px-4 rounded-lg font-medium shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 dark:bg-slate-800 dark:text-slate-200"
+          className="flex-1 flex items-center justify-center gap-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 py-3 px-4 rounded-lg font-medium shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 dark:bg-neutral-800 dark:text-neutral-200"
         >
           <Wand2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           <span>Polish</span>
@@ -104,7 +104,7 @@ export const OutputEngine: React.FC<Props> = ({
         <button 
           onClick={handleGenerateImage}
           disabled={generating}
-          className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white py-3 px-4 rounded-lg font-medium shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
+          className="flex-1 flex items-center justify-center gap-2 bg-neutral-700 dark:bg-neutral-600 hover:bg-neutral-800 dark:hover:bg-neutral-500 text-white py-3 px-4 rounded-lg font-medium shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
         >
           {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
           <span>Generate {state.imageSize} Image</span>
@@ -112,14 +112,14 @@ export const OutputEngine: React.FC<Props> = ({
       </div>
 
       {generatedImage && (
-        <div className="bg-white rounded-xl shadow-md border border-slate-200 p-4 dark:bg-slate-900 dark:border-slate-800">
+        <div className="bg-white rounded-xl shadow-md border border-neutral-200 p-4 dark:bg-neutral-900 dark:border-neutral-800">
            <div className="flex justify-between items-center mb-3">
-             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Result</h3>
-             <a href={generatedImage} download="generated_image.png" className="p-1.5 text-slate-400 hover:text-indigo-600">
+             <h3 className="text-sm font-bold text-neutral-700 dark:text-neutral-200 uppercase tracking-wider">Result</h3>
+             <a href={generatedImage} download="generated_image.png" className="p-1.5 text-neutral-400 hover:text-neutral-600">
                 <Download className="w-4 h-4" />
              </a>
            </div>
-           <div className="relative rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
+           <div className="relative rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800">
               <img src={generatedImage} alt="Generated" className="w-full h-auto object-contain max-h-[600px]" />
            </div>
         </div>
@@ -132,29 +132,29 @@ export const OutputEngine: React.FC<Props> = ({
       )}
 
       {/* Prompt QA */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800">
-        <div className="border-b border-slate-100 bg-slate-50 px-4 py-2 flex justify-between items-center dark:bg-slate-800 dark:border-slate-700">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Prompt QA</span>
+      <div className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden dark:bg-neutral-900 dark:border-neutral-800">
+        <div className="border-b border-neutral-100 bg-neutral-50 px-4 py-2 flex justify-between items-center dark:bg-neutral-800 dark:border-neutral-700">
+          <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Prompt QA</span>
           <div className="flex items-center gap-2">
-            <span className={`text-[10px] font-bold ${score > 80 ? 'text-green-500' : 'text-amber-500'}`}>Score: {score}</span>
-            <button onClick={onApplyFixes} className="text-[10px] bg-white border border-slate-200 px-2 py-1 rounded shadow-sm hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300">
+            <span className={`text-[10px] font-bold ${score > 80 ? 'text-green-500' : 'text-yellow-500'}`}>Score: {score}</span>
+            <button onClick={onApplyFixes} className="text-[10px] bg-white border border-neutral-200 px-2 py-1 rounded shadow-sm hover:bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300">
               <Hammer className="w-3 h-3 inline mr-1" /> Quick Fix
             </button>
           </div>
         </div>
         <div className="p-4 space-y-3">
           {issues.length === 0 ? (
-            <div className="text-sm text-slate-500 flex items-center gap-2">
+            <div className="text-sm text-neutral-500 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-500" />
               <span>Prompt is clean and optimized.</span>
             </div>
           ) : (
             issues.map((it, i) => (
-              <div key={i} className="flex gap-3 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-                {it.severity === 'warn' ? <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" /> : <Info className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />}
+              <div key={i} className="flex gap-3 p-2 rounded-lg bg-neutral-50 dark:bg-neutral-800/50">
+                {it.severity === 'warn' ? <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" /> : <Info className="w-4 h-4 text-neutral-500 shrink-0 mt-0.5" />}
                 <div className="min-w-0">
-                  <div className="text-xs font-bold text-slate-700 dark:text-slate-200">{it.title}</div>
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400">{it.detail}</div>
+                  <div className="text-xs font-bold text-neutral-700 dark:text-neutral-200">{it.title}</div>
+                  <div className="text-[10px] text-neutral-500 dark:text-neutral-400">{it.detail}</div>
                 </div>
               </div>
             ))

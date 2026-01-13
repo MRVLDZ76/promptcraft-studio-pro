@@ -320,17 +320,22 @@ export async function cacheCreatorProfile(profile: Omit<CreatorProfile, 'id' | '
  * Get cached creator profile
  */
 export async function getCachedCreatorProfile(platform: string, username: string) {
+  // Return null if platform or username is invalid
+  if (!platform || !username) {
+    return null;
+  }
+  
   const { data, error } = await supabase
     .from('creator_profiles')
     .select('*')
     .eq('platform', platform)
     .eq('username', username)
     .gt('expires_at', new Date().toISOString())
-    .single();
+    .maybeSingle(); // Use maybeSingle() instead of single() to avoid 406 errors
 
   if (error) {
-    if (error.code === 'PGRST116') return null; // Not found
-    throw error;
+    console.warn('Error fetching cached profile:', error);
+    return null;
   }
   return data;
 }
@@ -364,11 +369,11 @@ export async function getCachedVideoTranscript(videoId: string) {
     .select('*')
     .eq('video_id', videoId)
     .gt('expires_at', new Date().toISOString())
-    .single();
+    .maybeSingle(); // Use maybeSingle() instead of single() to avoid 406 errors
 
   if (error) {
-    if (error.code === 'PGRST116') return null;
-    throw error;
+    console.warn('Error fetching cached transcript:', error);
+    return null;
   }
   return data;
 }
@@ -450,11 +455,11 @@ export async function getCachedChannelData(handle: string) {
     .select('*')
     .eq('channel_handle', handle)
     .gt('expires_at', new Date().toISOString())
-    .single();
+    .maybeSingle(); // Use maybeSingle() instead of single() to avoid 406 errors
 
   if (error) {
-    if (error.code === 'PGRST116') return null;
-    throw error;
+    console.warn('Error fetching cached channel:', error);
+    return null;
   }
   return data;
 }
@@ -490,4 +495,116 @@ export async function logAPIUsage(usage: {
     .insert([usage]);
 
   if (error) console.error('Failed to log API usage:', error);
+}
+
+// ============================================
+// VECTOR SEARCH FUNCTIONS (RAG PIPELINE)
+// ============================================
+
+/**
+ * Store document with embedding
+ */
+export async function storeDocumentEmbedding(doc: {
+  content: string;
+  embedding: number[];
+  metadata?: any;
+  source?: string;
+  source_url?: string;
+  title?: string;
+  chunk_index?: number;
+}) {
+  const { data, error } = await supabase
+    .from('document_embeddings')
+    .insert([doc])
+    .select();
+
+  if (error) throw error;
+  return data[0];
+}
+
+/**
+ * Store analysis with embedding
+ */
+export async function storeAnalysisEmbedding(analysis: {
+  content: string;
+  embedding: number[];
+  analysis_id: string;
+  video_id?: string;
+  creator_name?: string;
+  scores?: any;
+  fallacy_count?: number;
+}) {
+  const { data, error } = await supabase
+    .from('analysis_embeddings')
+    .insert([analysis])
+    .select();
+
+  if (error) throw error;
+  return data[0];
+}
+
+/**
+ * Search for similar documents using vector similarity
+ */
+export async function searchSimilarDocuments(
+  queryEmbedding: number[],
+  matchThreshold: number = 0.7,
+  matchCount: number = 5,
+  filter: any = {}
+) {
+  const { data, error } = await supabase.rpc('match_documents', {
+    query_embedding: queryEmbedding,
+    match_threshold: matchThreshold,
+    match_count: matchCount,
+    filter: filter,
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Search for similar analyses using vector similarity
+ */
+export async function searchSimilarAnalysesDB(
+  queryEmbedding: number[],
+  matchThreshold: number = 0.7,
+  matchCount: number = 5
+) {
+  const { data, error } = await supabase.rpc('match_analyses', {
+    query_embedding: queryEmbedding,
+    match_threshold: matchThreshold,
+    match_count: matchCount,
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Delete document embeddings by source URL
+ */
+export async function deleteDocumentEmbeddingsBySource(sourceUrl: string) {
+  const { data, error } = await supabase
+    .from('document_embeddings')
+    .delete()
+    .eq('source_url', sourceUrl);
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Get vector store statistics
+ */
+export async function getVectorStoreStats() {
+  const [docStats, analysisStats] = await Promise.all([
+    supabase.from('document_embedding_stats').select('*').single(),
+    supabase.from('analysis_embedding_stats').select('*').single(),
+  ]);
+
+  return {
+    documents: docStats.data || {},
+    analyses: analysisStats.data || {},
+  };
 }

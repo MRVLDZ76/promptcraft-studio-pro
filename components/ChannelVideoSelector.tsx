@@ -19,9 +19,13 @@ export const ChannelVideoSelector: React.FC<ChannelVideoSelectorProps> = ({
 }) => {
   const [videos, setVideos] = React.useState<YouTubeVideoResult[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [loadingMore, setLoadingMore] = React.useState(false);
   const [loadingTranscript, setLoadingTranscript] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [sortBy, setSortBy] = React.useState<'relevance' | 'upload_date' | 'view_count'>('relevance');
+  const [nextPageToken, setNextPageToken] = React.useState<string | undefined>();
+  const [totalResults, setTotalResults] = React.useState<number | undefined>();
+  const [hasMore, setHasMore] = React.useState(false);
 
   React.useEffect(() => {
     if (isOpen && channelHandle) {
@@ -29,16 +33,41 @@ export const ChannelVideoSelector: React.FC<ChannelVideoSelectorProps> = ({
     }
   }, [isOpen, channelHandle, sortBy]);
 
-  const loadVideos = async () => {
-    setLoading(true);
+  const loadVideos = async (reset = true) => {
+    if (reset) {
+      setLoading(true);
+      setVideos([]);
+      setNextPageToken(undefined);
+    } else {
+      setLoadingMore(true);
+    }
     setError(null);
     try {
-      const channelVideos = await getChannelVideos(channelHandle, { sortBy });
-      setVideos(channelVideos);
+      const result = await getChannelVideos(channelHandle, undefined, { 
+        sortBy,
+        pageToken: reset ? undefined : nextPageToken 
+      });
+      
+      if (reset) {
+        setVideos(result.videos);
+      } else {
+        setVideos(prev => [...prev, ...result.videos]);
+      }
+      
+      setNextPageToken(result.nextPageToken);
+      setTotalResults(result.totalResults);
+      setHasMore(result.hasMore);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load videos');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const loadMoreVideos = () => {
+    if (hasMore && !loadingMore) {
+      loadVideos(false);
     }
   };
 
@@ -61,12 +90,15 @@ export const ChannelVideoSelector: React.FC<ChannelVideoSelectorProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-slate-200 dark:border-indigo-500/20">
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-neutral-200 dark:border-neutral-500/20">
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-cyan-600 p-6 rounded-t-2xl flex items-center justify-between">
+        <div className="bg-neutral-700 dark:bg-neutral-600 p-6 rounded-t-2xl flex items-center justify-between">
           <div>
             <h2 className="text-xl font-black text-white uppercase tracking-wide">Select Video</h2>
-            <p className="text-sm text-white/80 mt-1">Channel: {channelName}</p>
+            <p className="text-sm text-white/80 mt-1">
+              Channel: {channelName}
+              {totalResults && ` • ${totalResults.toLocaleString()} videos`}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -77,16 +109,16 @@ export const ChannelVideoSelector: React.FC<ChannelVideoSelectorProps> = ({
         </div>
 
         {/* Sort Controls */}
-        <div className="p-4 border-b border-slate-200 dark:border-indigo-500/10 bg-slate-50 dark:bg-slate-800/50">
+        <div className="p-4 border-b border-neutral-200 dark:border-neutral-500/10 bg-neutral-50 dark:bg-neutral-800/50">
           <div className="flex items-center gap-3">
-            <span className="text-xs font-black text-slate-600 dark:text-slate-400 uppercase">Sort By:</span>
+            <span className="text-xs font-black text-neutral-600 dark:text-neutral-400 uppercase">Sort By:</span>
             <div className="flex gap-2">
               <button
                 onClick={() => setSortBy('relevance')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
                   sortBy === 'relevance'
-                    ? 'bg-indigo-600 text-white shadow-lg'
-                    : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
+                    ? 'bg-neutral-700 text-white shadow-lg'
+                    : 'bg-white dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-600'
                 }`}
               >
                 Relevance
@@ -95,8 +127,8 @@ export const ChannelVideoSelector: React.FC<ChannelVideoSelectorProps> = ({
                 onClick={() => setSortBy('upload_date')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
                   sortBy === 'upload_date'
-                    ? 'bg-indigo-600 text-white shadow-lg'
-                    : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
+                    ? 'bg-neutral-700 text-white shadow-lg'
+                    : 'bg-white dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-600'
                 }`}
               >
                 <Calendar className="w-3 h-3 inline mr-1" />
@@ -106,8 +138,8 @@ export const ChannelVideoSelector: React.FC<ChannelVideoSelectorProps> = ({
                 onClick={() => setSortBy('view_count')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
                   sortBy === 'view_count'
-                    ? 'bg-indigo-600 text-white shadow-lg'
-                    : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
+                    ? 'bg-neutral-700 text-white shadow-lg'
+                    : 'bg-white dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-600'
                 }`}
               >
                 <Eye className="w-3 h-3 inline mr-1" />
@@ -122,8 +154,8 @@ export const ChannelVideoSelector: React.FC<ChannelVideoSelectorProps> = ({
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <div className="text-center">
-                <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mx-auto mb-4" />
-                <p className="text-sm font-bold text-slate-600 dark:text-slate-400">Loading videos...</p>
+                <Loader2 className="w-12 h-12 text-neutral-500 animate-spin mx-auto mb-4" />
+                <p className="text-sm font-bold text-neutral-600 dark:text-neutral-400">Loading videos...</p>
               </div>
             </div>
           ) : error ? (
@@ -138,21 +170,21 @@ export const ChannelVideoSelector: React.FC<ChannelVideoSelectorProps> = ({
             </div>
           ) : videos.length === 0 ? (
             <div className="text-center py-20">
-              <FileText className="w-16 h-16 text-slate-300 dark:text-slate-700 mx-auto mb-4" />
-              <p className="text-sm font-bold text-slate-600 dark:text-slate-400">No videos found</p>
+              <FileText className="w-16 h-16 text-neutral-300 dark:text-neutral-700 mx-auto mb-4" />
+              <p className="text-sm font-bold text-neutral-600 dark:text-neutral-400">No videos found</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {videos.map((video) => (
+              {videos.map((video, index) => (
                 <div
-                  key={video.video_id}
-                  className="bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-indigo-500/10 overflow-hidden hover:border-indigo-500/50 transition-all group"
+                  key={video.video_id || `video-${index}`}
+                  className="bg-neutral-50 dark:bg-neutral-800/40 rounded-xl border border-neutral-200 dark:border-neutral-500/10 overflow-hidden hover:border-neutral-500/50 transition-all group"
                 >
                   <div className="flex gap-4 p-4">
                     {/* Thumbnail */}
                     <div className="relative w-48 h-28 shrink-0 rounded-lg overflow-hidden">
                       <img
-                        src={video.thumbnail.static}
+                        src={video.thumbnail?.static || 'https://via.placeholder.com/480x270?text=No+Thumbnail'}
                         alt={video.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
@@ -172,13 +204,16 @@ export const ChannelVideoSelector: React.FC<ChannelVideoSelectorProps> = ({
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-cyan-500 transition-colors">
+                      <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200 mb-2 line-clamp-2 group-hover:text-neutral-600 dark:group-hover:text-neutral-400 transition-colors">
                         {video.title}
                       </h3>
                       
-                      <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mb-2">
+                      <div className="flex items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400 mb-2">
                         {video.channel.verified && (
-                          <span className="text-indigo-600 dark:text-cyan-500 font-black">✓ VERIFIED</span>
+                          <span className="text-neutral-600 dark:text-neutral-400 font-black">✓ VERIFIED</span>
+                        )}
+                        {video.extensions?.includes('CC') && (
+                          <span className="px-2 py-0.5 bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded text-xs font-bold">CC</span>
                         )}
                         <span className="flex items-center gap-1">
                           <Eye className="w-3 h-3" />
@@ -192,14 +227,14 @@ export const ChannelVideoSelector: React.FC<ChannelVideoSelectorProps> = ({
                         )}
                       </div>
 
-                      <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mb-3">
+                      <p className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-3">
                         {video.description}
                       </p>
 
                       <button
                         onClick={() => handleSelectVideo(video)}
                         disabled={loadingTranscript === video.video_id}
-                        className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-700 hover:to-cyan-700 disabled:from-slate-400 disabled:to-slate-500 text-white rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shadow-lg disabled:cursor-not-allowed"
+                        className="px-4 py-2 bg-neutral-700 dark:bg-neutral-600 hover:bg-neutral-800 dark:hover:bg-neutral-500 disabled:bg-neutral-400 text-white rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shadow-lg disabled:cursor-not-allowed"
                       >
                         {loadingTranscript === video.video_id ? (
                           <>
@@ -217,6 +252,29 @@ export const ChannelVideoSelector: React.FC<ChannelVideoSelectorProps> = ({
                   </div>
                 </div>
               ))}
+
+              {/* Load More Button */}
+              {hasMore && (
+                <div className="flex justify-center pt-4">
+                  <button
+                    onClick={loadMoreVideos}
+                    disabled={loadingMore}
+                    className="px-6 py-3 bg-neutral-700 dark:bg-neutral-600 hover:bg-neutral-800 dark:hover:bg-neutral-500 disabled:bg-neutral-400 text-white rounded-lg text-sm font-bold uppercase transition-all flex items-center gap-2 shadow-lg disabled:cursor-not-allowed"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading More...
+                      </>
+                    ) : (
+                      <>
+                        Load More Videos
+                        {nextPageToken && ` (${videos.length} of ${totalResults?.toLocaleString()})`}
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

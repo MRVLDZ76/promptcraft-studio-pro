@@ -39,21 +39,21 @@ export const ImageEditor: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 dark:bg-slate-900 dark:border-slate-800">
-        <h2 className="text-lg font-bold mb-4 flex items-center gap-2 dark:text-slate-100">
-          <Wand2 className="text-indigo-500" /> Nano Banana Image Editor
+      <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6 dark:bg-neutral-900 dark:border-neutral-800">
+        <h2 className="text-lg font-bold mb-4 flex items-center gap-2 dark:text-neutral-100">
+          <Wand2 className="text-neutral-500" /> Nano Banana Image Editor
         </h2>
         
         <div className="grid md:grid-cols-2 gap-6 mb-6">
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-400 uppercase">Original</label>
-            <div className="aspect-square bg-slate-50 rounded-lg border-2 border-dashed border-slate-200 flex flex-col items-center justify-center relative overflow-hidden dark:bg-slate-800 dark:border-slate-700">
+            <label className="text-xs font-bold text-neutral-400 uppercase">Original</label>
+            <div className="aspect-square bg-neutral-50 rounded-lg border-2 border-dashed border-neutral-200 flex flex-col items-center justify-center relative overflow-hidden dark:bg-neutral-800 dark:border-neutral-700">
               {image ? (
                 <img src={image} className="w-full h-full object-contain" alt="Upload preview" />
               ) : (
                 <>
-                  <Upload className="w-8 h-8 text-slate-300 mb-2" />
-                  <span className="text-xs text-slate-400">Click to upload image</span>
+                  <Upload className="w-8 h-8 text-neutral-300 mb-2" />
+                  <span className="text-xs text-neutral-400">Click to upload image</span>
                 </>
               )}
               <input 
@@ -66,16 +66,16 @@ export const ImageEditor: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-400 uppercase">Edited Result</label>
-            <div className="aspect-square bg-slate-50 rounded-lg border border-slate-200 flex flex-col items-center justify-center relative overflow-hidden dark:bg-slate-800 dark:border-slate-700">
+            <label className="text-xs font-bold text-neutral-400 uppercase">Edited Result</label>
+            <div className="aspect-square bg-neutral-50 rounded-lg border border-neutral-200 flex flex-col items-center justify-center relative overflow-hidden dark:bg-neutral-800 dark:border-neutral-700">
               {result ? (
                 <img src={result} className="w-full h-full object-contain" alt="Result" />
               ) : (
-                <span className="text-xs text-slate-400">Edit will appear here</span>
+                <span className="text-xs text-neutral-400">Edit will appear here</span>
               )}
               {loading && (
-                <div className="absolute inset-0 bg-white/60 flex items-center justify-center dark:bg-slate-900/60">
-                  <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+                <div className="absolute inset-0 bg-white/60 flex items-center justify-center dark:bg-neutral-900/60">
+                  <div className="animate-spin w-8 h-8 border-4 border-neutral-600 border-t-transparent rounded-full" />
                 </div>
               )}
             </div>
@@ -84,11 +84,11 @@ export const ImageEditor: React.FC = () => {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Instructions</label>
+            <label className="block text-xs font-bold text-neutral-500 uppercase mb-2">Instructions</label>
             <textarea 
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
-              className="w-full rounded-lg border-slate-200 bg-slate-50 p-3 text-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+              className="w-full rounded-lg border-neutral-200 bg-neutral-50 p-3 text-sm focus:ring-neutral-500 focus:border-neutral-500 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200"
               placeholder="e.g., Change the background to a sunset beach, or make the cat wear sunglasses"
               rows={3}
             />
@@ -98,7 +98,7 @@ export const ImageEditor: React.FC = () => {
             <button 
               onClick={handleEdit}
               disabled={!image || !prompt || loading}
-              className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              className="flex-1 bg-neutral-700 text-white py-3 rounded-lg font-medium hover:bg-neutral-600 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
             >
               <Wand2 className="w-4 h-4" /> Apply Edit
             </button>
@@ -106,7 +106,7 @@ export const ImageEditor: React.FC = () => {
               <a 
                 href={result} 
                 download="edited_image.png"
-                className="bg-slate-100 p-3 rounded-lg text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
+                className="bg-neutral-100 p-3 rounded-lg text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300"
               >
                 <Download className="w-5 h-5" />
               </a>

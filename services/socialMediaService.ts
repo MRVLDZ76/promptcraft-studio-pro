@@ -165,7 +165,7 @@ function calculateEngagement(views: number, followers: number): string {
 /**
  * Detect platform from URL or username
  */
-export function detectPlatform(input: string): 'youtube' | 'instagram' | null {
+export function detectPlatform(input: string): 'youtube' | 'instagram' {
   const cleaned = input.toLowerCase();
   
   if (cleaned.includes('youtube.com') || cleaned.includes('youtu.be')) {
@@ -175,8 +175,8 @@ export function detectPlatform(input: string): 'youtube' | 'instagram' | null {
     return 'instagram';
   }
   
-  // Default to YouTube if starts with @ and no clear indicator
-  return null;
+  // Default to YouTube if starts with @ or is a plain username
+  return 'youtube';
 }
 
 /**

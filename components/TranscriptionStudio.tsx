@@ -93,20 +93,20 @@ export const TranscriptionStudio: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 dark:bg-slate-900 dark:border-slate-800">
+      <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6 dark:bg-neutral-900 dark:border-neutral-800">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-bold flex items-center gap-2 dark:text-slate-100">
-            <Mic className="text-indigo-500" /> AI Media Transcription
+          <h2 className="text-lg font-bold flex items-center gap-2 dark:text-neutral-100">
+            <Mic className="text-neutral-500" /> AI Media Transcription
           </h2>
-          <div className="flex bg-slate-100 p-1 rounded-lg dark:bg-slate-800">
+          <div className="flex bg-neutral-100 p-1 rounded-lg dark:bg-neutral-800">
             {(['record', 'upload', 'link'] as Tab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
                   activeTab === tab 
-                    ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-indigo-400' 
-                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                    ? 'bg-white text-neutral-600 shadow-sm dark:bg-neutral-700 dark:text-neutral-400' 
+                    : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'
                 }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -116,14 +116,14 @@ export const TranscriptionStudio: React.FC = () => {
         </div>
 
         {activeTab === 'record' && (
-          <div className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 dark:bg-slate-800 dark:border-slate-700 mb-6 transition-all">
+          <div className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-neutral-200 rounded-xl bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 mb-6 transition-all">
             <div className="relative mb-6">
               <button
                 onClick={isRecording ? stopRecording : startRecording}
                 className={`w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-lg ${
                   isRecording 
                     ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
-                    : 'bg-indigo-600 hover:bg-indigo-700'
+                    : 'bg-neutral-700 hover:bg-neutral-600'
                 } text-white`}
               >
                 {isRecording ? <Square className="w-8 h-8 fill-current" /> : <Mic className="w-8 h-8" />}
@@ -132,7 +132,7 @@ export const TranscriptionStudio: React.FC = () => {
                  <div className="absolute -inset-2 border-2 border-red-500 rounded-full animate-ping opacity-20" />
               )}
             </div>
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+            <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">
               {isRecording ? "Recording... Click to stop and transcribe." : "Click microphone to start recording."}
             </p>
           </div>
@@ -141,16 +141,16 @@ export const TranscriptionStudio: React.FC = () => {
         {activeTab === 'upload' && (
           <div 
             onClick={() => fileInputRef.current?.click()}
-            className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 dark:bg-slate-800 dark:border-slate-700 mb-6 cursor-pointer hover:border-indigo-400 transition-all group"
+            className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-neutral-200 rounded-xl bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 mb-6 cursor-pointer hover:border-neutral-400 transition-all group"
           >
             <div className="flex gap-4 mb-4">
-              <FileAudio className="w-10 h-10 text-slate-300 group-hover:text-indigo-400 transition-colors" />
-              <FileVideo className="w-10 h-10 text-slate-300 group-hover:text-indigo-400 transition-colors" />
+              <FileAudio className="w-10 h-10 text-neutral-300 group-hover:text-neutral-400 transition-colors" />
+              <FileVideo className="w-10 h-10 text-neutral-300 group-hover:text-neutral-400 transition-colors" />
             </div>
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-              Drag & drop or <span className="text-indigo-600 font-bold">browse</span> audio/video files
+            <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">
+              Drag & drop or <span className="text-neutral-600 font-bold">browse</span> audio/video files
             </p>
-            <p className="text-[10px] text-slate-400 mt-2 uppercase tracking-widest font-bold">Supports MP3, WAV, MP4, WEBM</p>
+            <p className="text-[10px] text-neutral-400 mt-2 uppercase tracking-widest font-bold">Supports MP3, WAV, MP4, WEBM</p>
             <input 
               type="file" 
               ref={fileInputRef} 
@@ -162,28 +162,28 @@ export const TranscriptionStudio: React.FC = () => {
         )}
 
         {activeTab === 'link' && (
-          <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 dark:bg-slate-800 dark:border-slate-700 mb-6">
+          <div className="p-6 border-2 border-dashed border-neutral-200 rounded-xl bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 mb-6">
             <div className="max-w-md mx-auto space-y-4">
-              <label className="block text-xs font-bold text-slate-500 uppercase">Paste Video Link</label>
+              <label className="block text-xs font-bold text-neutral-500 uppercase">Paste Video Link</label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
-                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                   <input 
                     type="text" 
                     value={ytUrl}
                     onChange={(e) => setYtUrl(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200" 
+                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-neutral-200 bg-white text-sm focus:ring-2 focus:ring-neutral-500 outline-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-200" 
                     placeholder="https://www.youtube.com/watch?v=..." 
                   />
                 </div>
                 <button 
                   onClick={handleUrlSubmit}
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors"
+                  className="bg-neutral-700 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-neutral-600 transition-colors"
                 >
                   Analyze
                 </button>
               </div>
-              <p className="text-[10px] text-slate-400 leading-relaxed italic">
+              <p className="text-[10px] text-neutral-400 leading-relaxed italic">
                 Note: Browser-based transcription of external URLs may be limited by CORS. Local file upload is recommended for full reliability.
               </p>
             </div>
@@ -192,11 +192,11 @@ export const TranscriptionStudio: React.FC = () => {
 
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Transcription Result</label>
+            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Transcription Result</label>
             {transcription && (
               <button 
                 onClick={handleCopy}
-                className="text-xs flex items-center gap-1.5 text-indigo-600 font-semibold hover:underline"
+                className="text-xs flex items-center gap-1.5 text-neutral-600 font-semibold hover:underline"
               >
                 {copying ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                 {copying ? 'Copied!' : 'Copy to Clipboard'}
@@ -205,16 +205,16 @@ export const TranscriptionStudio: React.FC = () => {
           </div>
           
           <div className="relative">
-            <div className={`min-h-[200px] w-full p-5 rounded-xl border border-slate-200 bg-slate-50 text-sm leading-relaxed dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 ${loading ? 'opacity-50' : 'opacity-100'} transition-opacity`}>
+            <div className={`min-h-[200px] w-full p-5 rounded-xl border border-neutral-200 bg-neutral-50 text-sm leading-relaxed dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 ${loading ? 'opacity-50' : 'opacity-100'} transition-opacity`}>
               {loading ? (
-                <div className="flex flex-col items-center justify-center h-32 gap-3 text-slate-400">
+                <div className="flex flex-col items-center justify-center h-32 gap-3 text-neutral-400">
                   <Loader2 className="w-6 h-6 animate-spin" />
                   <span>Processing media with Gemini...</span>
                 </div>
               ) : transcription ? (
                 transcription
               ) : (
-                <span className="text-slate-400 italic">No output yet. Input media to start.</span>
+                <span className="text-neutral-400 italic">No output yet. Input media to start.</span>
               )}
             </div>
           </div>

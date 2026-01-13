@@ -91,29 +91,29 @@ export const AudioStudio: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 dark:bg-slate-900 dark:border-slate-800">
-        <h2 className="text-lg font-bold mb-4 flex items-center gap-2 dark:text-slate-100">
-          <Volume2 className="text-indigo-500" /> AI Speech Studio (TTS)
+      <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6 dark:bg-neutral-900 dark:border-neutral-800">
+        <h2 className="text-lg font-bold mb-4 flex items-center gap-2 dark:text-neutral-100">
+          <Volume2 className="text-neutral-500" /> AI Speech Studio (TTS)
         </h2>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Text to Speak</label>
+            <label className="block text-xs font-bold text-neutral-500 uppercase mb-2">Text to Speak</label>
             <textarea
               value={text}
               onChange={e => setText(e.target.value)}
-              className="w-full h-40 rounded-lg border-slate-200 bg-slate-50 p-4 text-base focus:ring-indigo-500 focus:border-indigo-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+              className="w-full h-40 rounded-lg border-neutral-200 bg-neutral-50 p-4 text-base focus:ring-neutral-500 focus:border-neutral-500 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200"
               placeholder="Enter text here..."
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Voice</label>
+              <label className="block text-xs font-bold text-neutral-500 uppercase mb-2">Voice</label>
               <select
                 value={voice}
                 onChange={e => setVoice(e.target.value)}
-                className="w-full rounded-lg border-slate-200 bg-slate-50 p-2.5 text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+                className="w-full rounded-lg border-neutral-200 bg-neutral-50 p-2.5 text-sm dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200"
               >
                 {voices.map(v => <option key={v} value={v}>{v}</option>)}
               </select>
@@ -122,7 +122,7 @@ export const AudioStudio: React.FC = () => {
               <button
                 onClick={handleGenerate}
                 disabled={loading || !text}
-                className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                className="w-full bg-neutral-700 text-white py-2.5 rounded-lg font-bold hover:bg-neutral-600 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
                 Generate Audio
@@ -131,9 +131,9 @@ export const AudioStudio: React.FC = () => {
           </div>
 
           {audioUrl && (
-            <div className="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between dark:bg-slate-800 dark:border-slate-700">
+            <div className="mt-8 p-4 bg-neutral-50 rounded-lg border border-neutral-200 flex items-center justify-between dark:bg-neutral-800 dark:border-neutral-700">
               <audio src={audioUrl} controls className="h-10" />
-              <a href={audioUrl} download="speech.wav" className="p-2 text-slate-600 hover:text-indigo-600 dark:text-slate-400">
+              <a href={audioUrl} download="speech.wav" className="p-2 text-neutral-600 hover:text-neutral-600 dark:text-neutral-400">
                 <Download className="w-5 h-5" />
               </a>
             </div>

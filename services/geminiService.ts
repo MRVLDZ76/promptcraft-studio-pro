@@ -164,18 +164,42 @@ export const analyzeVideoContent = async (
   `;
 
   const jsonSchemaRequest = `
-    CRITICAL: Output must include a structured JSON section for graph visualization:
+    CRITICAL: Output must include a structured JSON section for graph visualization AND scoring engine:
     
     JSON_OUTPUT_START
     {
       "debate_title": "string",
       "total_duration": number_in_seconds,
+      
+      "claims": [
+        {
+          "text": "The exact claim made by the speaker",
+          "speaker": "A" | "B",
+          "category": "factual" | "opinion" | "prediction" | "citation",
+          "verified": true | false,
+          "confidence": 0.0 to 1.0,
+          "sources": ["URL or citation if verifiable"],
+          "timestamp": 0.0
+        }
+      ],
+      
+      "fallacies": [
+        {
+          "type": "ad_hominem" | "strawman" | "slippery_slope" | "false_dilemma" | "appeal_to_authority" | "hasty_generalization" | "post_hoc" | "red_herring" | "circular_reasoning" | "appeal_to_emotion" | "bandwagon" | "no_true_scotsman" | "tu_quoque" | "whataboutism",
+          "speaker": "A" | "B",
+          "severity": 1 to 10,
+          "quote": "Exact words from transcript",
+          "explanation": "Why this is a fallacy",
+          "timestamp": 0.0
+        }
+      ],
+      
       "argument_nodes": [
         {
           "id": "arg_001",
           "timestamp_in": 0.0,
           "timestamp_out": 15.5,
-          "speaker_id": "A" or "B",
+          "speaker_id": "A" | "B",
           "claim_text_short": "max 7 words",
           "claim_text_full": "complete argument",
           "toulmin_component": "CLAIM" | "GROUNDS" | "WARRANT" | "BACKING" | "QUALIFIER" | "REBUTTAL",
@@ -185,23 +209,54 @@ export const analyzeVideoContent = async (
           "confidence": 0.0 to 1.0
         }
       ],
+      
+      "wsdcScores": {
+        "A": { "content": 0-100, "style": 0-100, "strategy": 0-100 },
+        "B": { "content": 0-100, "style": 0-100, "strategy": 0-100 }
+      },
+      
       "temporal_scores": [
         {"timestamp": 60, "participant_a_score": 75, "participant_b_score": 68}
       ],
+      
+      "scores": {
+        "content": {"a": 0-${config.wsdcWeights.content}, "b": 0-${config.wsdcWeights.content}},
+        "style": {"a": 0-${config.wsdcWeights.style}, "b": 0-${config.wsdcWeights.style}},
+        "strategy": {"a": 0-${config.wsdcWeights.strategy}, "b": 0-${config.wsdcWeights.strategy}},
+        "total": {"a": 0-100, "b": 0-100}
+      },
+      
+      "gamification": {
+        "winner": "A" | "B" | "TIE",
+        "points_a": 0-100,
+        "points_b": 0-100,
+        "truth_pot": "$XX.XX",
+        "award": "Award Title",
+        "truth_density": 0-100
+      },
+      
       "final_verdict": {
         "winner": "A" | "B" | "TIE",
-        "scores": {
-          "content": {"a": 38, "b": 35},
-          "style": {"a": 36, "b": 39},
-          "strategy": {"a": 18, "b": 16},
-          "total": {"a": 92, "b": 90}
-        },
-        "key_fallacies": ["Speaker A: Strawman at 2:15"],
-        "strongest_argument": "description",
-        "weakest_argument": "description"
+        "summary": "2-3 sentence verdict explaining the decision",
+        "key_fallacies": ["Speaker A: Strawman at 2:15", "Speaker B: Ad Hominem at 5:30"],
+        "strongest_argument": "Description of the strongest argument presented",
+        "weakest_argument": "Description of the weakest argument or biggest logical gap"
       }
     }
     JSON_OUTPUT_END
+    
+    SCORING ENGINE REQUIREMENTS:
+    - The "claims" array must list ALL factual claims made by each speaker
+    - For each claim, assess if it is "verified" (true/false) based on:
+      * Cross-reference with RAG knowledge sources
+      * Internal consistency with other statements
+      * Credibility of cited sources
+    - "confidence" is YOUR confidence in the verification (0.0-1.0)
+    - The "fallacies" array must catch ALL logical fallacies with severity 1-10:
+      * 1-3: Minor (forgivable within margin of error)
+      * 4-6: Moderate (notable but not argument-destroying)
+      * 7-10: Severe (fundamentally undermines the argument)
+    - Include exact quotes for fallacies to enable audit trail
   `;
 
   const finalPrompt = `

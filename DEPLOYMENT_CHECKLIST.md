@@ -90,7 +90,7 @@ vercel --prod
 
 **Verification:**
 - [ ] Deployment successful
-- [ ] Deployment URL displayed (e.g., `https://ai-arbiter-pro.vercel.app`)
+- [ ] Deployment URL displayed (e.g., `vercel.apphttps://ai-arbiter-pro.`)
 - [ ] Copy URL for next step
 
 ---

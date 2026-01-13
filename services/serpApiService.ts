@@ -59,7 +59,8 @@ export interface YouTubeVideoResult {
   published_date: string;
   views: number;
   length: string;
-  description: string;
+  description?: string;
+  extensions?: string[]; // CC, New, etc.
   thumbnail: {
     static: string;
   };
@@ -107,8 +108,12 @@ export interface TranscriptAPIResponse {
     engine: string;
     v: string;
   };
+  search_information?: {
+    results_state?: string;
+  };
   transcript?: TranscriptSnippet[];
   languages?: TranscriptLanguage[];
+  error?: string;
 }
 
 export interface SerpAPIResponse {
@@ -146,6 +151,14 @@ export interface SearchFilters {
   duration?: 'short' | 'medium' | 'long' | 'any'; // <4min, 4-20min, >20min
   uploadDate?: 'hour' | 'today' | 'week' | 'month' | 'year' | 'any';
   features?: ('hd' | 'subtitles' | '4k' | 'live' | 'purchased')[];
+  pageToken?: string; // For pagination
+}
+
+export interface ChannelVideosResult {
+  videos: YouTubeVideoResult[];
+  totalResults?: number;
+  nextPageToken?: string;
+  hasMore: boolean;
 }
 
 /**
@@ -215,23 +228,86 @@ export async function searchChannel(channelName: string): Promise<SerpAPIRespons
  */
 export async function getChannelVideos(
   channelHandle: string,
+  channelId?: string,
   filters?: SearchFilters
-): Promise<YouTubeVideoResult[]> {
+): Promise<ChannelVideosResult> {
   try {
     const cleanHandle = channelHandle.replace(/^@/, '').trim();
     
-    // Search for videos from this channel
-    const query = `${cleanHandle}`;
-    const response = await searchYouTube(query, filters);
+    // Search for videos by exact channel handle in quotes
+    const query = `"${cleanHandle}" site:youtube.com`;
+    const params: any = {
+      search_query: query,
+    };
     
-    // Filter results to only include videos from this channel
-    const channelVideos = (response.video_results || []).filter((video: YouTubeVideoResult) => {
-      const videoChannel = video.channel.name.toLowerCase();
-      const searchChannel = cleanHandle.toLowerCase();
-      return videoChannel.includes(searchChannel) || searchChannel.includes(videoChannel);
+    // Add pagination token if provided
+    if (filters?.pageToken) {
+      params.sp = filters.pageToken;
+    } else {
+      // Add sorting if specified (only for first page)
+      if (filters?.sortBy === 'upload_date') {
+        params.sp = 'CAISAhAB'; // Sort by upload date
+      } else if (filters?.sortBy === 'view_count') {
+        params.sp = 'CAMSAhAB'; // Sort by view count
+      }
+    }
+    
+    const response = await callSerpAPI('youtube', params);
+    
+    // Collect videos from both video_results and shorts_results
+    const videos: YouTubeVideoResult[] = [];
+    
+    // Add regular videos with thumbnail fallback and video_id extraction
+    if (response.video_results) {
+      response.video_results.forEach((video: any) => {
+        videos.push({
+          ...video,
+          video_id: video.video_id || extractYouTubeVideoId(video.link) || '',
+          thumbnail: video.thumbnail || { static: 'https://via.placeholder.com/480x270?text=No+Thumbnail' }
+        });
+      });
+    }
+    
+    // Add shorts (convert to video format)
+    if (response.shorts_results) {
+      response.shorts_results.forEach((shortsGroup: any) => {
+        if (shortsGroup.shorts && Array.isArray(shortsGroup.shorts)) {
+          shortsGroup.shorts.forEach((short: any) => {
+            videos.push({
+              position_on_page: shortsGroup.position_on_page,
+              title: short.title,
+              link: short.link,
+              channel: {
+                name: cleanHandle,
+                link: `https://www.youtube.com/@${cleanHandle}`,
+                thumbnail: ''
+              },
+              published_date: 'Unknown',
+              views: short.views || 0,
+              length: '0:60',
+              description: '',
+              thumbnail: { static: short.thumbnail || 'https://via.placeholder.com/480x270?text=No+Thumbnail' },
+              video_id: short.video_id || extractYouTubeVideoId(short.link) || ''
+            });
+          });
+        }
+      });
+    }
+    
+    // Filter to only include videos from the channel (case-insensitive match)
+    const filteredVideos = videos.filter(video => {
+      const channelName = video.channel?.name?.toLowerCase() || '';
+      const handleLower = cleanHandle.toLowerCase();
+      return channelName.includes(handleLower) || 
+             channelName.replace(/\s/g, '').includes(handleLower.replace(/\s/g, ''));
     });
     
-    return channelVideos;
+    return {
+      videos: filteredVideos,
+      totalResults: response.search_information?.total_results,
+      nextPageToken: response.pagination?.next_page_token,
+      hasMore: !!response.pagination?.next_page_token
+    };
   } catch (error) {
     console.error('Error fetching channel videos:', error);
     throw error;
@@ -277,17 +353,29 @@ export async function getVideoTranscript(
   languageCode?: string
 ): Promise<TranscriptData> {
   const params: Record<string, string> = {
-    v: videoId
+    v: videoId  // SerpAPI uses 'v' parameter, not 'video_id'
   };
 
+  // Only add language_code if explicitly specified
+  // Otherwise, SerpAPI will use the video's default language
   if (languageCode) {
     params.language_code = languageCode;
   }
 
+  console.log('Fetching transcript for video:', videoId, languageCode ? `(language: ${languageCode})` : '(default language)');
   const data: TranscriptAPIResponse = await callSerpAPI('youtube_video_transcript', params);
 
+  // Check for SerpAPI error response
+  if (data.error) {
+    throw new Error(data.error);
+  }
+
+  // Check if transcript data is available
   if (!data.transcript || data.transcript.length === 0) {
-    throw new Error('No transcript available for this video');
+    const errorMsg = data.search_information?.results_state === 'Fully empty'
+      ? 'This video does not have captions/transcripts available. Please select a video with captions enabled.'
+      : 'No transcript available for this video';
+    throw new Error(errorMsg);
   }
 
   // Combine all snippets into full transcript
@@ -306,23 +394,43 @@ export async function getVideoTranscript(
 
 /**
  * Get transcript with automatic retry for different languages
+ * Tries in this order: default language -> preferred language -> Spanish -> English
  */
 export async function getVideoTranscriptWithFallback(
   videoId: string,
-  preferredLanguage: string = 'en'
+  preferredLanguage?: string
 ): Promise<TranscriptData> {
+  // Try 1: Default language (whatever the video provides)
   try {
-    // Try preferred language first
-    return await getVideoTranscript(videoId, preferredLanguage);
+    console.log('Trying to get transcript in default language...');
+    return await getVideoTranscript(videoId);
   } catch (error) {
-    console.warn(`Failed to get transcript in ${preferredLanguage}, trying default...`);
+    console.warn('Default language failed:', error);
+  }
+
+  // Try 2: Preferred language if specified
+  if (preferredLanguage) {
     try {
-      // Fallback to default language
-      return await getVideoTranscript(videoId);
-    } catch (fallbackError) {
-      throw new Error('No transcript available in any language');
+      console.log(`Trying preferred language: ${preferredLanguage}`);
+      return await getVideoTranscript(videoId, preferredLanguage);
+    } catch (error) {
+      console.warn(`Preferred language ${preferredLanguage} failed:`, error);
     }
   }
+
+  // Try 3: Common languages
+  const commonLanguages = ['es', 'en', 'es-ES', 'en-US'];
+  for (const lang of commonLanguages) {
+    try {
+      console.log(`Trying language: ${lang}`);
+      return await getVideoTranscript(videoId, lang);
+    } catch (error) {
+      console.warn(`Language ${lang} failed:`, error);
+    }
+  }
+
+  // All attempts failed
+  throw new Error('This video does not have captions/transcripts available. Please select a different video with captions enabled.');
 }
 
 /**
@@ -389,31 +497,51 @@ export async function getChannelDetails(handleOrId: string): Promise<ChannelDeta
     // Clean the handle/ID
     const cleanHandle = handleOrId.replace(/^@/, '').trim();
     
-    // Search for the channel using proxy
+    console.log('Fetching channel details for:', cleanHandle);
+    
+    // Use youtube search engine to find the channel
+    // Search for the channel name/handle - SerpAPI will return channel_results
+    const searchQuery = cleanHandle.startsWith('UC') 
+      ? cleanHandle 
+      : `${cleanHandle} youtube channel`;
+    
     const searchData = await callSerpAPI('youtube', {
-      search_query: cleanHandle
+      search_query: searchQuery
     });
     
-    // Find the channel in search results
+    // Extract channel data from channel_results (first result is usually the correct one)
     const channelResult = searchData.channel_results?.[0];
     
     if (!channelResult) {
       throw new Error(`Channel not found: ${cleanHandle}`);
     }
+    
+    // SerpAPI channel_results structure
+    const metadata = channelResult;
+    const stats = channelResult;
+    
+    // Parse subscriber count from SerpAPI format
+    // channel_results has: subscribers (number) and potentially subscriber_count (string)
+    let subscriberCount = channelResult.subscribers || 0;
+    let subscriberText = channelResult.subscribers 
+      ? formatSubscribers(channelResult.subscribers) 
+      : '0 subscribers';
+    
+    // Parse video count - may not be available in channel_results
+    let videoCount = 0;
 
-    // Extract channel data from search results
     return {
       title: channelResult.title || 'Unknown Channel',
       channelId: channelResult.channel_id || '',
-      handle: channelResult.handle || cleanHandle,
+      handle: channelResult.handle || `@${cleanHandle}`,
       description: channelResult.description || '',
-      subscribers: channelResult.subscribers || 0,
-      subscribersText: channelResult.subscribers_text || '0 subscribers',
-      totalViews: channelResult.total_views,
-      totalVideos: channelResult.video_count,
+      subscribers: subscriberCount,
+      subscribersText: subscriberText,
+      totalViews: undefined, // Not available in channel_results
+      totalVideos: videoCount,
       verified: channelResult.verified || false,
       thumbnail: channelResult.thumbnail || '',
-      bannerImage: channelResult.banner_image,
+      bannerImage: undefined,
       links: channelResult.links || []
     };
   } catch (error) {
