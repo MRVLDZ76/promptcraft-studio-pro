@@ -8,6 +8,7 @@ import { VideoStudio } from './components/VideoStudio';
 import { AudioStudio } from './components/AudioStudio';
 import { TranscriptionStudio } from './components/TranscriptionStudio';
 import { AnalysisStudio } from './components/AnalysisStudio';
+import { NarrativeStudio } from './components/narrative/NarrativeStudio';
 import { polishPrompt, generateSequence } from './services/geminiService';
 import { 
   LayoutGrid, 
@@ -277,7 +278,7 @@ const App: React.FC = () => {
     );
   }
 
-  const workbenchIgnoredModes = [Mode.EDIT, Mode.AUDIO, Mode.TRANSCRIPTION, Mode.ANALYSIS];
+  const workbenchIgnoredModes = [Mode.EDIT, Mode.AUDIO, Mode.TRANSCRIPTION, Mode.ANALYSIS, Mode.NARRATIVE];
 
   // Navigation items grouped by category
   const navGroups = [
@@ -296,6 +297,12 @@ const App: React.FC = () => {
         { id: Mode.EDIT, label: 'Nano Editor', icon: Wand2 },
         { id: Mode.AUDIO, label: 'AI Speech', icon: Volume2 },
         { id: Mode.TRANSCRIPTION, label: 'Transcribe', icon: Mic },
+      ]
+    },
+    {
+      label: 'Narrative Production',
+      items: [
+        { id: Mode.NARRATIVE, label: 'Video Stories', icon: Film },
       ]
     }
   ];
@@ -381,6 +388,7 @@ const App: React.FC = () => {
             {mode === Mode.AUDIO && <AudioStudio />}
             {mode === Mode.TRANSCRIPTION && <TranscriptionStudio />}
             {mode === Mode.ANALYSIS && <AnalysisStudio />}
+            {mode === Mode.NARRATIVE && <NarrativeStudio />}
             {mode === Mode.VIDEO && <VideoStudio initialPrompt={currentPrompt} initialAspect={state.aspect} />}
             {mode === Mode.SEQUENCE && (
               <div className="max-w-4xl mx-auto space-y-6 p-6 pb-20">

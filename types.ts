@@ -5,7 +5,8 @@ export enum Mode {
   EDIT = 'edit',
   AUDIO = 'audio',
   TRANSCRIPTION = 'transcription',
-  ANALYSIS = 'analysis'
+  ANALYSIS = 'analysis',
+  NARRATIVE = 'narrative'
 }
 
 export enum AnalysisMode {

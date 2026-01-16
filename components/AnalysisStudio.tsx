@@ -1550,7 +1550,7 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                    onClick={() => { setSystemMode('arena'); setAnalysisMode(AnalysisMode.ARENA); }}
                    className={`flex-1 px-3 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${
                      systemMode === 'arena'
-                       ? 'bg-neutral-800 dark:bg-neutral-200 text-white shadow-lg'
+                       ? 'bg-neutral-800 dark:bg-neutral-200 dark:text-black text-white shadow-lg'
                        : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
                    }`}
                  >
@@ -1561,7 +1561,7 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                    onClick={() => { setSystemMode('solo'); setAnalysisMode(AnalysisMode.MONOLOGUE); }}
                    className={`flex-1 px-3 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${
                      systemMode === 'solo'
-                       ? 'bg-neutral-800 dark:bg-neutral-200 text-white shadow-lg'
+                       ? 'bg-neutral-800 dark:bg-neutral-200 dark:text-black text-white shadow-lg'
                        : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
                    }`}
                  >
@@ -1722,15 +1722,15 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                  </div>
                ) : (
                  <div className="flex gap-2 items-center">
-                   <div className="flex-1 bg-neutral-800 dark:bg-neutral-200 rounded-lg px-3 py-2 text-white">
+                   <div className="flex-1 bg-neutral-800 dark:bg-neutral-200 dark: text-black rounded-lg px-3 py-2 text-white">
                      <div className="text-[7px] font-bold uppercase opacity-80">Content</div>
                      <div className="text-[11px] font-black">{wsdcWeights.content}%</div>
                    </div>
-                   <div className="flex-1 bg-neutral-700 dark:bg-neutral-300 rounded-lg px-3 py-2 text-white">
+                   <div className="flex-1 bg-neutral-700 dark:bg-neutral-300 dark:text-black rounded-lg px-3 py-2 text-white">
                      <div className="text-[7px] font-bold uppercase opacity-80">Style</div>
                      <div className="text-[11px] font-black">{wsdcWeights.style}%</div>
                    </div>
-                   <div className="flex-1 bg-neutral-800 dark:bg-neutral-200 rounded-lg px-3 py-2 text-white">
+                   <div className="flex-1 bg-neutral-800 dark:bg-neutral-200 dark: text-black rounded-lg px-3 py-2 text-white">
                      <div className="text-[7px] font-bold uppercase opacity-80">Strategy</div>
                      <div className="text-[11px] font-black">{wsdcWeights.strategy}%</div>
                    </div>
@@ -2988,7 +2988,7 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                         onClick={() => { setSystemMode('arena'); setAnalysisMode(AnalysisMode.ARENA); }}
                         className={`flex-1 px-6 py-4 rounded-lg text-sm font-black uppercase transition-all ${
                           systemMode === 'arena'
-                            ? 'bg-neutral-800 dark:bg-neutral-200 text-white shadow-lg'
+                            ? 'bg-neutral-800 dark:bg-neutral-200 dark:text-black text-white shadow-lg'
                             : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
                         }`}
                       >
@@ -2999,7 +2999,7 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                         onClick={() => { setSystemMode('solo'); setAnalysisMode(AnalysisMode.MONOLOGUE); }}
                         className={`flex-1 px-6 py-4 rounded-lg text-sm font-black uppercase transition-all ${
                           systemMode === 'solo'
-                            ? 'bg-neutral-800 dark:bg-neutral-200 text-white shadow-lg'
+                            ? 'bg-neutral-800 dark:bg-neutral-200 dark:text-black text-white shadow-lg'
                             : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
                         }`}
                       >
