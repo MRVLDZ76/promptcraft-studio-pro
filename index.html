@@ -1,0 +1,1683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Prompt Engineering Studio v3 (Pro)</title>
+    <script>
+        // Tailwind CDN config must be set before loading the script.
+        // (We still use a lightweight CSS-based dark theme to avoid rewriting every class.)
+        window.tailwind = window.tailwind || {};
+        window.tailwind.config = { darkMode: 'class' };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- 
+        v3 Updates:
+        - Added Negative Prompt field (Global).
+        - Added Aspect Ratio Selector.
+        - Sequence Mode: Prompts are now editable textareas.
+        - Sequence Mode: Added Bulk Export (Download/Copy All).
+        - AI: Added "Variations" capability logic foundation.
+    -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f8fafc; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .tooltip { visibility: hidden; opacity: 0; transition: opacity 0.2s, visibility 0.2s; }
+        .has-tooltip:hover .tooltip { visibility: visible; opacity: 1; }
+
+        .loader {
+            width: 18px; height: 18px;
+            border: 2px solid #e2e8f0; border-bottom-color: #6366f1;
+            border-radius: 50%; display: inline-block;
+            box-sizing: border-box; animation: rotation 1s linear infinite;
+        }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Smooth transitions */
+        .input-transition { transition: all 0.2s ease-in-out; }
+
+        /* Lightweight theme override (avoids rewriting every Tailwind class) */
+        body.theme-dark { background: #070a12 !important; color: #e5e7eb !important; }
+        body.theme-dark .bg-white { background-color: #0b1220 !important; }
+        body.theme-dark .bg-slate-50 { background-color: #0b1220 !important; }
+        body.theme-dark .bg-slate-50\/50 { background-color: rgba(11, 18, 32, 0.7) !important; }
+        body.theme-dark .text-slate-800,
+        body.theme-dark .text-slate-700,
+        body.theme-dark .text-slate-600,
+        body.theme-dark .text-slate-500 { color: #e5e7eb !important; }
+        body.theme-dark .text-slate-400 { color: #9ca3af !important; }
+        body.theme-dark .border-slate-200,
+        body.theme-dark .border-slate-100,
+        body.theme-dark .border-indigo-100 { border-color: rgba(148, 163, 184, 0.25) !important; }
+        body.theme-dark .shadow-sm,
+        body.theme-dark .shadow-md,
+        body.theme-dark .shadow-xl { box-shadow: 0 10px 30px rgba(0,0,0,0.45) !important; }
+        body.theme-dark textarea,
+        body.theme-dark select,
+        body.theme-dark input { background-color: rgba(2, 6, 23, 0.6) !important; color: #e5e7eb !important; }
+        body.theme-dark ::-webkit-scrollbar-track { background: #0b1220; }
+        body.theme-dark ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.35); }
+    </style>
+</head>
+    <body class="bg-slate-50 text-slate-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 shadow-sm shrink-0 z-20">
+        <div class="max-w-screen-2xl mx-auto px-4 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="bg-indigo-600 text-white p-1.5 rounded-md">
+                    <i class="fa-solid fa-layer-group text-sm"></i>
+                </div>
+                <h1 class="text-lg font-bold text-slate-800 tracking-tight">Prompt<span class="text-indigo-600">Studio</span> <span class="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 uppercase tracking-wider">Pro v3</span></h1>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <div class="hidden sm:flex items-center gap-2 text-xs text-slate-400 mr-2">
+                    <span id="statusIndicator" class="flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-slate-300"></span> API Disconnected
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button id="themeToggleBtn" class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-2 py-1 rounded shadow-sm transition-all" title="Toggle theme" aria-label="Toggle theme">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+                    <button id="exportBtn" class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-2 py-1 rounded shadow-sm transition-all" title="Export project" aria-label="Export project">
+                        <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                    </button>
+                    <button id="importBtn" class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-2 py-1 rounded shadow-sm transition-all" title="Import project" aria-label="Import project">
+                        <i class="fa-solid fa-arrow-down-to-bracket"></i>
+                    </button>
+                    <input id="importFile" type="file" accept="application/json" class="hidden" />
+                </div>
+
+                <div class="relative group">
+                    <div class="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
+                        <i class="fa-brands fa-google text-slate-400"></i>
+                        <input type="password" id="apiKeyInput" placeholder="Gemini API Key" class="bg-transparent border-none text-xs focus:ring-0 w-32 focus:w-48 transition-all placeholder-slate-400 text-slate-700 font-mono">
+                    </div>
+                    <div class="absolute right-0 top-full mt-2 w-64 bg-slate-900 text-white text-xs p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                        Required for Magic Polish and Sequence Generation. Stored strictly in your browser's LocalStorage.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex flex-col lg:flex-row flex-1 overflow-hidden max-w-screen-2xl mx-auto w-full">
+        
+        <!-- LEFT PANEL: Workbench (Scrollable) -->
+        <aside class="w-full lg:w-[450px] xl:w-[500px] flex flex-col border-r border-slate-200 bg-white overflow-y-auto shrink-0 z-10">
+            <div class="p-5 space-y-6">
+                
+                <!-- 1. Global Settings (New in v3) -->
+                <div class="flex gap-3">
+                    <div class="w-1/2">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Aspect Ratio</label>
+                        <select id="aspectRatio" class="w-full text-xs bg-slate-50 border-slate-200 rounded-md focus:border-indigo-500 focus:ring-indigo-500 py-2">
+                            <option value="">Default (1:1)</option>
+                            <option value="16:9">16:9 (Cinema)</option>
+                            <option value="9:16">9:16 (Vertical)</option>
+                            <option value="21:9">21:9 (Ultrawide)</option>
+                            <option value="4:3">4:3 (TV)</option>
+                            <option value="3:2">3:2 (Photo)</option>
+                        </select>
+                    </div>
+                    <div class="w-1/2">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Model Target</label>
+                        <select id="modelTarget" class="w-full text-xs bg-slate-50 border-slate-200 rounded-md focus:border-indigo-500 focus:ring-indigo-500 py-2">
+                            <option value="generic">Universal</option>
+                            <option value="midjourney">Midjourney</option>
+                            <option value="veo">Google Veo</option>
+                            <option value="stable">Stable Diffusion</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 2. The Subject -->
+                <section>
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                            <i class="fa-solid fa-user-astronaut text-indigo-500"></i> Subject
+                        </h3>
+                        <div class="flex items-center gap-1">
+                            <select id="characterSelect" class="text-[10px] border-none bg-slate-50 hover:bg-slate-100 rounded text-slate-600 py-1 pl-2 pr-6 cursor-pointer focus:ring-0">
+                                <option value="">Load Saved...</option>
+                            </select>
+                            <button id="saveCharacterBtn" class="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 p-1.5 rounded transition-colors" title="Save Subject">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                            </button>
+                            <button id="manageCharactersBtn" class="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 p-1.5 rounded transition-colors" title="Manage Subjects" aria-label="Manage Subjects">
+                                <i class="fa-solid fa-gear"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="subjectInput" rows="3" class="w-full rounded-md border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 text-sm text-slate-700 placeholder-slate-400 input-transition p-3" placeholder="A cyberpunk samurai standing in neon rain..."></textarea>
+                </section>
+
+                <!-- 2b. Scene & Intent (New) -->
+                <section class="space-y-3">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-sm font-semibold text-slate-700"><i class="fa-solid fa-map-location-dot text-indigo-500"></i> Scene & Intent</h3>
+                        <span class="text-[10px] text-slate-400">(Improves coherence)</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Detail Level</label>
+                            <select id="detailLevel" class="w-full text-xs bg-slate-50 border-slate-200 rounded-md focus:border-indigo-500 focus:ring-indigo-500 py-2">
+                                <option value="compact">Compact</option>
+                                <option value="detailed" selected>Detailed</option>
+                                <option value="ultra">Ultra</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Composition</label>
+                            <select id="compositionInput" class="w-full text-xs bg-slate-50 border-slate-200 rounded-md focus:border-indigo-500 focus:ring-indigo-500 py-2">
+                                <option value="">Unspecified</option>
+                                <option value="Wide shot, establishing composition">Wide / Establishing</option>
+                                <option value="Medium shot, clear subject framing">Medium</option>
+                                <option value="Close-up, intimate framing">Close-up</option>
+                                <option value="Extreme close-up, macro-level framing">Extreme close-up</option>
+                                <option value="Over-the-shoulder shot, cinematic blocking">Over-the-shoulder</option>
+                                <option value="POV shot, first-person perspective">POV</option>
+                                <option value="Aerial shot, top-down or drone perspective">Aerial / Top-down</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Setting / Location</label>
+                        <input id="settingInput" type="text" class="w-full rounded-md border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 text-sm text-slate-700 placeholder-slate-400 input-transition p-2.5" placeholder="e.g., rain-soaked neon alley, ancient temple at dusk" />
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Action / What’s happening</label>
+                        <input id="actionInput" type="text" class="w-full rounded-md border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 text-sm text-slate-700 placeholder-slate-400 input-transition p-2.5" placeholder="e.g., draws a katana, slow breath visible in cold air" />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Mood</label>
+                            <select id="moodInput" class="w-full text-xs bg-slate-50 border-slate-200 rounded-md focus:border-indigo-500 focus:ring-indigo-500 py-2">
+                                <option value="">Unspecified</option>
+                                <option value="calm, contemplative mood">Calm</option>
+                                <option value="ominous, tense mood">Ominous</option>
+                                <option value="dreamy, ethereal mood">Dreamy</option>
+                                <option value="energetic, high-adrenaline mood">Energetic</option>
+                                <option value="melancholic, quiet mood">Melancholic</option>
+                                <option value="whimsical, playful mood">Whimsical</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Color Palette</label>
+                            <select id="colorInput" class="w-full text-xs bg-slate-50 border-slate-200 rounded-md focus:border-indigo-500 focus:ring-indigo-500 py-2">
+                                <option value="">Unspecified</option>
+                                <option value="teal and orange cinematic grading">Teal & Orange</option>
+                                <option value="soft pastel color palette">Pastel</option>
+                                <option value="high-contrast monochrome palette">Monochrome</option>
+                                <option value="neon cyberpunk palette, cyan/magenta">Neon</option>
+                                <option value="warm palette, amber highlights">Warm</option>
+                                <option value="cool palette, blue shadows">Cool</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. Negative Prompt (New in v3) -->
+                <section>
+                    <div class="flex items-center gap-2 mb-2">
+                        <h3 class="text-sm font-semibold text-slate-700"><i class="fa-solid fa-ban text-red-400"></i> Negative Prompt</h3>
+                        <span class="text-[10px] text-slate-400">(What to exclude)</span>
+                    </div>
+                    <textarea id="negativeInput" rows="2" class="w-full rounded-md border-slate-200 bg-slate-50 focus:bg-white focus:border-red-400 focus:ring-red-400 text-xs text-slate-600 placeholder-slate-400 input-transition p-2.5" placeholder="text, watermark, blurry, deformed, ugly, bad anatomy..."></textarea>
+                </section>
+
+                <!-- 4. Style Ingredients -->
+                <section class="space-y-5">
+                    <div class="flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <i class="fa-solid fa-sliders text-indigo-500"></i>
+                        <h3 class="text-sm font-semibold text-slate-700">Visual Ingredients</h3>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2">Camera & Lens</label>
+                        <div class="grid grid-cols-2 gap-2" id="cameraOptions"></div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2">Lighting</label>
+                        <div class="grid grid-cols-2 gap-2" id="lightingOptions"></div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2">Film Stock</label>
+                        <div class="grid grid-cols-2 gap-2" id="filmOptions"></div>
+                    </div>
+
+                    <!-- Custom ingredients (New) -->
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2">Custom Ingredients</label>
+                        <div class="flex gap-2">
+                            <input id="customIngredientInput" type="text" class="flex-1 text-xs rounded-md border border-slate-200 bg-slate-50 p-2" placeholder="e.g., shallow depth of field, rain droplets, anamorphic flare" />
+                            <button id="addCustomIngredientBtn" class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 rounded shadow-sm" title="Add">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                        <div id="customIngredientChips" class="flex flex-wrap gap-2 mt-2"></div>
+                    </div>
+                </section>
+            </div>
+        </aside>
+
+        <!-- CENTER/RIGHT PANEL: Output Engine -->
+        <main class="flex-1 flex flex-col min-w-0 bg-slate-50/50">
+            
+            <!-- Mode Tabs -->
+            <div class="bg-white border-b border-slate-200 px-6 pt-2">
+                <div class="flex space-x-6">
+                    <button class="mode-tab pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 text-indigo-600 border-indigo-600" data-mode="image">
+                        <i class="fa-regular fa-image"></i> Image
+                    </button>
+                    <button class="mode-tab pb-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition-colors flex items-center gap-2" data-mode="video">
+                        <i class="fa-solid fa-video"></i> Video Clip
+                    </button>
+                    <button class="mode-tab pb-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition-colors flex items-center gap-2" data-mode="sequence">
+                        <i class="fa-solid fa-clapperboard"></i> Sequence Planner
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable Content Area -->
+            <div class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+                
+                <!-- SINGLE MODE (Image & Video) -->
+                <div id="singleOutputView" class="max-w-3xl mx-auto space-y-6">
+                    
+                    <!-- Video Params (Conditional) -->
+                    <div id="videoControls" class="hidden p-5 bg-white rounded-xl border border-indigo-100 shadow-sm ring-1 ring-indigo-50">
+                        <h4 class="text-xs font-bold text-indigo-600 uppercase tracking-wide mb-3">Motion Parameters</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] text-slate-500 font-semibold mb-1">Movement</label>
+                                <select id="cameraMoveInput" class="w-full text-xs rounded border-slate-200 bg-slate-50 py-2">
+                                    <option value="">Static / Subtle</option>
+                                    <option value="Slow Pan Right">Slow Pan Right</option>
+                                    <option value="Slow Pan Left">Slow Pan Left</option>
+                                    <option value="Push In">Push In (Dolly)</option>
+                                    <option value="Pull Out">Pull Out (Dolly)</option>
+                                    <option value="Tracking Shot">Tracking Shot</option>
+                                    <option value="Drone Flyover">Drone Flyover</option>
+                                    <option value="FPV Speed">FPV Speed</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 font-semibold mb-1">Duration/Type</label>
+                                <select id="durationInput" class="w-full text-xs rounded border-slate-200 bg-slate-50 py-2">
+                                    <option value="">Default</option>
+                                    <option value="Seamless Loop">Seamless Loop</option>
+                                    <option value="Slow Motion">Slow Motion (60fps)</option>
+                                    <option value="Timelapse">Timelapse</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Prompt Output -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group">
+                        <div class="border-b border-slate-100 bg-slate-50 px-4 py-2 flex justify-between items-center">
+                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Final Prompt</span>
+                            <div class="flex items-center gap-2">
+                                <span id="tokenCount" class="text-[10px] font-mono text-slate-400">0 chars</span>
+                                <button id="undoBtn" class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-2 py-1 rounded shadow-sm transition-all" title="Undo (Ctrl+Z)" aria-label="Undo">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                                <button id="redoBtn" class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-2 py-1 rounded shadow-sm transition-all" title="Redo (Ctrl+Y)" aria-label="Redo">
+                                    <i class="fa-solid fa-rotate-right"></i>
+                                </button>
+                                <button id="copyBtn" class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-2 py-1 rounded shadow-sm transition-all" title="Copy">
+                                    <i class="fa-regular fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <textarea id="finalOutput" readonly class="w-full h-40 p-5 text-sm text-slate-700 font-mono resize-none focus:outline-none bg-white"></textarea>
+                    </div>
+
+                    <!-- AI Actions -->
+                    <div class="flex gap-3">
+                        <button id="magicPolishBtn" class="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white py-2.5 px-4 rounded-lg font-medium shadow-md transition-all text-sm active:scale-[0.98]">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span>AI Enhance</span>
+                            <div id="magicLoader" class="loader hidden ml-2 border-white/30 border-t-white"></div>
+                        </button>
+                    </div>
+
+                    <!-- Prompt QA (New: High-leverage linter) -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="border-b border-slate-100 bg-slate-50 px-4 py-2 flex justify-between items-center">
+                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Prompt QA</span>
+                            <div class="flex items-center gap-2">
+                                <span id="qaScore" class="text-[10px] font-mono text-slate-400">Score: 100</span>
+                                <button id="applyQaFixesBtn" class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-2 py-1 rounded shadow-sm transition-all" title="Apply safe fixes">
+                                    <i class="fa-solid fa-screwdriver-wrench"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="qaList" class="p-4 space-y-2 text-sm"></div>
+                    </div>
+
+                </div>
+
+                <!-- SEQUENCE MODE (Planner) -->
+                <div id="sequenceOutputView" class="hidden h-full flex flex-col max-w-5xl mx-auto">
+                    
+                    <!-- Planning Controls -->
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm mb-6">
+                        <div class="flex flex-col md:flex-row gap-5 mb-4">
+                            <div class="flex-1">
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Narrative Arc</label>
+                                <textarea id="seqNarrative" rows="1" class="w-full text-sm rounded-md border-slate-200 bg-slate-50 focus:bg-white focus:ring-indigo-500 p-2" placeholder="Describe the video story flow (e.g. A robot wakes up, explores a forest, and finds a flower)"></textarea>
+                            </div>
+                            <div class="flex gap-4 shrink-0">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Total Sec</label>
+                                    <input type="number" id="seqTotalTime" value="24" class="w-20 text-sm rounded-md border-slate-200 p-2">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Clip Len</label>
+                                    <input type="number" id="seqClipTime" value="6" class="w-20 text-sm rounded-md border-slate-200 p-2">
+                                </div>
+                            </div>
+                        </div>
+                        <button id="generateSeqBtn" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-film"></i> Generate Video Plan
+                            <div id="seqLoader" class="loader hidden ml-2 border-white/30 border-t-white"></div>
+                        </button>
+                    </div>
+
+                    <!-- Tool Bar for Results -->
+                    <div id="seqToolbar" class="hidden flex justify-between items-center mb-3 px-1">
+                        <h3 class="text-sm font-bold text-slate-700">Scene Manifest</h3>
+                        <div class="flex gap-2">
+                            <button onclick="downloadSequence()" class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded shadow-sm">
+                                <i class="fa-solid fa-download mr-1"></i> Download .txt
+                            </button>
+                            <button onclick="copyAllSequence()" class="text-xs bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded shadow-sm font-medium">
+                                <i class="fa-regular fa-copy mr-1"></i> Copy All
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Results List -->
+                    <div id="sequenceResults" class="space-y-4 pb-10">
+                        <!-- Empty State -->
+                        <div class="text-center py-16 border-2 border-dashed border-slate-200 rounded-xl">
+                            <div class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i class="fa-solid fa-compass-drafting text-slate-300 text-xl"></i>
+                            </div>
+                            <p class="text-slate-400 text-sm font-medium">Plan your multi-clip video story above.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal: Character Manager -->
+    <div id="charModal" class="hidden fixed inset-0 z-50">
+        <div class="absolute inset-0 bg-black/50"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="w-full max-w-2xl bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+                <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800">Subjects Library</h3>
+                        <p class="text-xs text-slate-400">Rename, delete, search, and load saved subjects.</p>
+                    </div>
+                    <button id="closeCharModalBtn" class="text-slate-400 hover:text-slate-700" aria-label="Close">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="p-4 space-y-3">
+                    <div class="flex gap-2">
+                        <input id="charSearch" type="text" class="flex-1 text-sm rounded-md border border-slate-200 bg-slate-50 p-2" placeholder="Search subjects..." />
+                        <button id="clearAllCharsBtn" class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded shadow-sm" title="Delete all subjects">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                    <div id="charList" class="max-h-[55vh] overflow-auto divide-y divide-slate-100 border border-slate-200 rounded-lg"></div>
+                </div>
+                <div class="px-4 py-3 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+                    <button id="exportCharsBtn" class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded shadow-sm">Export Subjects</button>
+                    <button id="closeCharModalBtn2" class="text-xs bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded shadow-sm">Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS Logic -->
+    <script>
+        // --- Data ---
+        const DATA = {
+            cameras: [
+                { id: 'cam_35', label: '35mm Prime', value: 'Shot on 35mm lens, f/1.8, natural depth of field', desc: 'Versatile, human eye perspective' },
+                { id: 'cam_85', label: '85mm Portrait', value: 'Shot on 85mm lens, f/1.4, strong bokeh', desc: 'Isolates subject, creamy background' },
+                { id: 'cam_16', label: '16mm Wide', value: 'Shot on 16mm wide angle lens, slight distortion', desc: 'Dynamic, expansive, action' },
+                { id: 'cam_macro', label: '100mm Macro', value: 'Macro photography, extreme close-up detail', desc: 'Texture, eyes, tiny objects' }
+            ],
+            lighting: [
+                { id: 'lit_gold', label: 'Golden Hour', value: 'Golden hour lighting, warm sun flare, rim light', desc: 'Sunset/Sunrise magic' },
+                { id: 'lit_soft', label: 'Soft Studio', value: 'Softbox diffused lighting, even illumination', desc: 'Clean, flattering, commercial' },
+                { id: 'lit_neon', label: 'Neon Cyber', value: 'Neon lighting, cyan and magenta highlights, dark shadows', desc: 'Sci-fi, futuristic, urban' },
+                { id: 'lit_vol', label: 'Volumetric', value: 'Volumetric lighting, god rays, atmospheric fog, cinematic haze', desc: 'Moody, depth, dusty' }
+            ],
+            film: [
+                { id: 'fm_ptra', label: 'Kodak Portra', value: 'Kodak Portra 400 film stock, fine grain, warm tones', desc: 'Classic analog warmth' },
+                { id: 'fm_bw', label: 'Tri-X B&W', value: 'Kodak Tri-X 400, high contrast black and white', desc: 'Gritty monochrome' },
+                { id: 'fm_digi', label: 'Digital 8K', value: 'Unreal Engine 5 render, 8k resolution, octane render, sharp', desc: 'Ultra-modern, clean' },
+                { id: 'fm_vhs', label: 'VHS Tape', value: 'VHS aesthetic, chromatic aberration, scan lines, 1990s', desc: 'Retro glitchy' }
+            ]
+        };
+
+        const App = {
+            state: {
+                mode: 'image',
+                subject: '',
+                negative: '',
+                aspect: '',
+                model: 'generic',
+                style: { cam: '', light: [], film: '' },
+                scene: { setting: '', action: '', composition: '', mood: '', color: '' },
+                detailLevel: 'detailed',
+                customIngredients: [],
+                video: { move: '', dur: '' },
+                apiKey: '',
+                theme: 'light'
+            },
+
+            history: {
+                stack: [],
+                index: -1,
+                locked: false
+            },
+
+            constants: {
+                STORAGE_KEY_STATE: 'ps_state_v4',
+                STORAGE_KEY_API: 'gemini_api_key',
+                STORAGE_KEY_CHARS: 'ps_characters_v2'
+            },
+
+            utils: {
+                debounce(fn, ms) {
+                    let t;
+                    return (...args) => {
+                        clearTimeout(t);
+                        t = setTimeout(() => fn(...args), ms);
+                    };
+                },
+
+                approxTokens(text) {
+                    // Very rough heuristic used for UX only.
+                    return Math.max(0, Math.round((text || '').length / 4));
+                },
+
+                safeJSONParse(text) {
+                    if (typeof text !== 'string') return null;
+                    const trimmed = text.trim();
+                    // Handle common Gemini patterns: fenced code blocks.
+                    const unfenced = trimmed
+                        .replace(/^```(?:json)?\s*/i, '')
+                        .replace(/```\s*$/i, '')
+                        .trim();
+                    try { return JSON.parse(unfenced); } catch { return null; }
+                },
+
+                async copy(text) {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        return true;
+                    } catch {
+                        return false;
+                    }
+                },
+
+                downloadText(filename, text) {
+                    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                },
+
+                downloadJSON(filename, obj) {
+                    const text = JSON.stringify(obj, null, 2);
+                    const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                },
+
+                clampInt(v, min, max, fallback) {
+                    const n = Number(v);
+                    if (!Number.isFinite(n)) return fallback;
+                    return Math.min(max, Math.max(min, Math.trunc(n)));
+                }
+            },
+            
+            init() {
+                // Load persisted state first (includes styles + theme + fields)
+                this.loadState();
+                // Load API key (kept separate for backwards compatibility)
+                const key = localStorage.getItem(this.constants.STORAGE_KEY_API);
+                if (key && !this.state.apiKey) this.state.apiKey = key;
+
+                document.getElementById('apiKeyInput').value = this.state.apiKey || '';
+                this.updateStatus(!!(this.state.apiKey || '').trim());
+
+                this.applyThemeToUI();
+
+                this.loadCharacters();
+                this.renderUI();
+                this.bindEvents();
+                this.applyStateToUI();
+                this.updatePrompt();
+            },
+
+            updateStatus(connected) {
+                const el = document.getElementById('statusIndicator');
+                if(connected) el.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500"></span> API Ready`;
+                else el.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-300"></span> API Disconnected`;
+            },
+
+            saveStateDebounced: null,
+
+            loadState() {
+                try {
+                    const raw = localStorage.getItem(this.constants.STORAGE_KEY_STATE);
+                    if (!raw) return;
+                    const parsed = JSON.parse(raw);
+                    if (!parsed || typeof parsed !== 'object') return;
+                    // Merge carefully to keep defaults for new fields.
+                    this.state = {
+                        ...this.state,
+                        ...parsed,
+                        style: { ...this.state.style, ...(parsed.style || {}) },
+                        video: { ...this.state.video, ...(parsed.video || {}) }
+                    };
+                } catch {
+                    // Ignore corrupted storage; user can re-save.
+                }
+            },
+
+            saveStateNow() {
+                const toSave = {
+                    mode: this.state.mode,
+                    subject: this.state.subject,
+                    negative: this.state.negative,
+                    aspect: this.state.aspect,
+                    model: this.state.model,
+                    style: this.state.style,
+                    scene: this.state.scene,
+                    detailLevel: this.state.detailLevel,
+                    customIngredients: this.state.customIngredients,
+                    video: this.state.video,
+                    theme: this.state.theme
+                };
+                localStorage.setItem(this.constants.STORAGE_KEY_STATE, JSON.stringify(toSave));
+            },
+
+            applyStateToUI() {
+                // Inputs
+                document.getElementById('subjectInput').value = this.state.subject || '';
+                document.getElementById('negativeInput').value = this.state.negative || '';
+                document.getElementById('aspectRatio').value = this.state.aspect || '';
+                document.getElementById('modelTarget').value = this.state.model || 'generic';
+                document.getElementById('cameraMoveInput').value = this.state.video.move || '';
+                document.getElementById('durationInput').value = this.state.video.dur || '';
+
+                document.getElementById('detailLevel').value = this.state.detailLevel || 'detailed';
+                document.getElementById('compositionInput').value = (this.state.scene && this.state.scene.composition) ? this.state.scene.composition : '';
+                document.getElementById('settingInput').value = (this.state.scene && this.state.scene.setting) ? this.state.scene.setting : '';
+                document.getElementById('actionInput').value = (this.state.scene && this.state.scene.action) ? this.state.scene.action : '';
+                document.getElementById('moodInput').value = (this.state.scene && this.state.scene.mood) ? this.state.scene.mood : '';
+                document.getElementById('colorInput').value = (this.state.scene && this.state.scene.color) ? this.state.scene.color : '';
+
+                // Radio/checkbox selections
+                if (this.state.style.cam) {
+                    const cam = document.querySelector(`input[name="camera"][value="${CSS.escape(this.state.style.cam)}"]`);
+                    if (cam) cam.checked = true;
+                }
+                if (this.state.style.film) {
+                    const film = document.querySelector(`input[name="film"][value="${CSS.escape(this.state.style.film)}"]`);
+                    if (film) film.checked = true;
+                }
+                document.querySelectorAll('#lightingOptions input[type="checkbox"]').forEach(el => {
+                    el.checked = (this.state.style.light || []).includes(el.value);
+                });
+
+                this.renderCustomIngredientChips();
+
+                // Mode tab + video controls
+                document.querySelectorAll('.mode-tab').forEach(b => {
+                    const active = b.dataset.mode === this.state.mode;
+                    b.className = `mode-tab pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${active ? 'text-indigo-600 border-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`;
+                });
+                document.getElementById('singleOutputView').classList.toggle('hidden', this.state.mode === 'sequence');
+                document.getElementById('sequenceOutputView').classList.toggle('hidden', this.state.mode !== 'sequence');
+                document.getElementById('videoControls').classList.toggle('hidden', this.state.mode !== 'video');
+            },
+
+            applyThemeToUI() {
+                document.body.classList.toggle('theme-dark', this.state.theme === 'dark');
+                const icon = document.querySelector('#themeToggleBtn i');
+                if (icon) icon.className = this.state.theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+            },
+
+            renderUI() {
+                const mkRadio = (g, name, key) => {
+                    const el = document.getElementById(name + 'Options');
+                    el.innerHTML = g.map(i => `
+                        <div class="relative has-tooltip">
+                            <input type="radio" name="${name}" id="${i.id}" value="${i.value}" class="peer hidden">
+                            <label for="${i.id}" class="block text-center px-2 py-2 bg-slate-50 border border-slate-200 rounded text-[10px] cursor-pointer hover:bg-slate-100 peer-checked:bg-indigo-50 peer-checked:border-indigo-500 peer-checked:text-indigo-700 transition-all font-medium truncate">${i.label}</label>
+                            <div class="tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-slate-800 text-white text-[10px] rounded z-20 whitespace-nowrap">${i.desc}</div>
+                        </div>
+                    `).join('');
+                };
+                
+                mkRadio(DATA.cameras, 'camera', 'cam');
+                mkRadio(DATA.film, 'film', 'film');
+                
+                // Lighting is Checkbox
+                const lEl = document.getElementById('lightingOptions');
+                lEl.innerHTML = DATA.lighting.map(i => `
+                    <div class="relative has-tooltip">
+                        <input type="checkbox" id="${i.id}" value="${i.value}" class="peer hidden">
+                        <label for="${i.id}" class="block text-center px-2 py-2 bg-slate-50 border border-slate-200 rounded text-[10px] cursor-pointer hover:bg-slate-100 peer-checked:bg-indigo-50 peer-checked:border-indigo-500 peer-checked:text-indigo-700 transition-all font-medium truncate">${i.label}</label>
+                        <div class="tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-slate-800 text-white text-[10px] rounded z-20 whitespace-nowrap">${i.desc}</div>
+                    </div>
+                `).join('');
+            },
+
+            bindEvents() {
+                // Inputs
+                const on = (id, ev, fn) => document.getElementById(id).addEventListener(ev, fn);
+
+                if (!this.saveStateDebounced) {
+                    this.saveStateDebounced = this.utils.debounce(() => this.saveStateNow(), 250);
+                }
+                
+                on('subjectInput', 'input', e => { this.state.subject = e.target.value; this.saveStateDebounced(); this.updatePrompt(); });
+                on('negativeInput', 'input', e => { this.state.negative = e.target.value; this.saveStateDebounced(); this.updatePrompt(); });
+                on('aspectRatio', 'change', e => { this.state.aspect = e.target.value; this.saveStateDebounced(); this.updatePrompt(); });
+                on('modelTarget', 'change', e => { this.state.model = e.target.value; this.saveStateDebounced(); this.updatePrompt(); });
+
+                on('detailLevel', 'change', e => { this.state.detailLevel = e.target.value; this.saveStateDebounced(); this.updatePrompt(); });
+                on('compositionInput', 'change', e => { this.state.scene.composition = e.target.value; this.saveStateDebounced(); this.updatePrompt(); });
+                on('settingInput', 'input', e => { this.state.scene.setting = e.target.value; this.saveStateDebounced(); this.updatePrompt(); });
+                on('actionInput', 'input', e => { this.state.scene.action = e.target.value; this.saveStateDebounced(); this.updatePrompt(); });
+                on('moodInput', 'change', e => { this.state.scene.mood = e.target.value; this.saveStateDebounced(); this.updatePrompt(); });
+                on('colorInput', 'change', e => { this.state.scene.color = e.target.value; this.saveStateDebounced(); this.updatePrompt(); });
+                
+                on('cameraMoveInput', 'change', e => { this.state.video.move = e.target.value; this.saveStateDebounced(); this.updatePrompt(); });
+                on('durationInput', 'change', e => { this.state.video.dur = e.target.value; this.saveStateDebounced(); this.updatePrompt(); });
+
+                on('apiKeyInput', 'input', e => { 
+                    this.state.apiKey = (e.target.value || '').trim();
+                    localStorage.setItem(this.constants.STORAGE_KEY_API, this.state.apiKey);
+                    this.updateStatus(!!this.state.apiKey);
+                });
+
+                on('themeToggleBtn', 'click', () => {
+                    this.state.theme = this.state.theme === 'dark' ? 'light' : 'dark';
+                    this.applyThemeToUI();
+                    this.saveStateNow();
+                });
+
+                on('exportBtn', 'click', () => this.exportProject());
+                on('importBtn', 'click', () => document.getElementById('importFile').click());
+                on('importFile', 'change', (e) => this.importProjectFromFile(e));
+
+                // Style Listeners
+                document.querySelectorAll('input[name="camera"]').forEach(el => el.addEventListener('change', e => { this.state.style.cam = e.target.value; this.saveStateDebounced(); this.updatePrompt(); }));
+                document.querySelectorAll('input[name="film"]').forEach(el => el.addEventListener('change', e => { this.state.style.film = e.target.value; this.saveStateDebounced(); this.updatePrompt(); }));
+                document.querySelectorAll('#lightingOptions input').forEach(el => el.addEventListener('change', e => {
+                    if(e.target.checked) this.state.style.light.push(e.target.value);
+                    else this.state.style.light = this.state.style.light.filter(x => x !== e.target.value);
+                    // Deduplicate just in case.
+                    this.state.style.light = Array.from(new Set(this.state.style.light));
+                    this.saveStateDebounced();
+                    this.updatePrompt();
+                }));
+
+                // Mode Tabs
+                document.querySelectorAll('.mode-tab').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        this.state.mode = btn.dataset.mode;
+                        this.saveStateDebounced();
+                        // Tab Styling
+                        document.querySelectorAll('.mode-tab').forEach(b => {
+                            const active = b.dataset.mode === this.state.mode;
+                            b.className = `mode-tab pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${active ? 'text-indigo-600 border-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`;
+                        });
+                        // View Toggle
+                        document.getElementById('singleOutputView').classList.toggle('hidden', this.state.mode === 'sequence');
+                        document.getElementById('sequenceOutputView').classList.toggle('hidden', this.state.mode !== 'sequence');
+                        document.getElementById('videoControls').classList.toggle('hidden', this.state.mode !== 'video');
+                        
+                        this.updatePrompt();
+                    });
+                });
+
+                // Buttons
+                on('copyBtn', 'click', () => this.copyToClip(document.getElementById('finalOutput').value, 'copyBtn'));
+                on('undoBtn', 'click', () => this.undo());
+                on('redoBtn', 'click', () => this.redo());
+                on('saveCharacterBtn', 'click', () => this.saveCharacter());
+                on('characterSelect', 'change', e => this.loadCharacterData(e.target.value));
+                on('manageCharactersBtn', 'click', () => this.openCharModal());
+                on('magicPolishBtn', 'click', () => this.runAI('polish'));
+                on('generateSeqBtn', 'click', () => this.runAI('sequence'));
+
+                on('applyQaFixesBtn', 'click', () => this.applySafeQaFixes());
+
+                on('addCustomIngredientBtn', 'click', () => this.addCustomIngredientFromUI());
+                on('customIngredientInput', 'keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.addCustomIngredientFromUI();
+                    }
+                });
+
+                // Modal buttons
+                on('closeCharModalBtn', 'click', () => this.closeCharModal());
+                on('closeCharModalBtn2', 'click', () => this.closeCharModal());
+                on('charSearch', 'input', (e) => this.renderCharList(e.target.value));
+                on('clearAllCharsBtn', 'click', () => this.clearAllCharacters());
+                on('exportCharsBtn', 'click', () => this.exportCharactersOnly());
+
+                // Keyboard shortcuts
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        const modal = document.getElementById('charModal');
+                        if (!modal.classList.contains('hidden')) this.closeCharModal();
+                    }
+
+                    const isMac = navigator.platform.toUpperCase().includes('MAC');
+                    const mod = isMac ? e.metaKey : e.ctrlKey;
+                    if (!mod) return;
+
+                    if (e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); this.undo(); }
+                    if (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey)) { e.preventDefault(); this.redo(); }
+                    if (e.key === 'Enter') {
+                        // Ctrl+Enter = AI Enhance
+                        e.preventDefault();
+                        if (this.state.mode !== 'sequence') this.runAI('polish');
+                    }
+                });
+            },
+
+            pushHistory(prompt) {
+                if (this.history.locked) return;
+                const last = this.history.stack[this.history.index];
+                if (last === prompt) return;
+
+                // Drop redo branch.
+                if (this.history.index < this.history.stack.length - 1) {
+                    this.history.stack = this.history.stack.slice(0, this.history.index + 1);
+                }
+                this.history.stack.push(prompt);
+                this.history.index = this.history.stack.length - 1;
+                this.updateHistoryButtons();
+            },
+
+            updateHistoryButtons() {
+                const undo = document.getElementById('undoBtn');
+                const redo = document.getElementById('redoBtn');
+                const canUndo = this.history.index > 0;
+                const canRedo = this.history.index < this.history.stack.length - 1;
+                undo.disabled = !canUndo;
+                redo.disabled = !canRedo;
+                undo.classList.toggle('opacity-50', !canUndo);
+                redo.classList.toggle('opacity-50', !canRedo);
+            },
+
+            undo() {
+                if (this.history.index <= 0) return;
+                this.history.index -= 1;
+                this.history.locked = true;
+                document.getElementById('finalOutput').value = this.history.stack[this.history.index] || '';
+                this.history.locked = false;
+                this.updateHistoryButtons();
+            },
+
+            redo() {
+                if (this.history.index >= this.history.stack.length - 1) return;
+                this.history.index += 1;
+                this.history.locked = true;
+                document.getElementById('finalOutput').value = this.history.stack[this.history.index] || '';
+                this.history.locked = false;
+                this.updateHistoryButtons();
+            },
+
+            formatAspectForModel(aspect) {
+                if (!aspect) return '';
+                if (this.state.model === 'midjourney') return `--ar ${aspect}`;
+                if (this.state.model === 'stable') return `aspect ratio ${aspect}`;
+                if (this.state.model === 'veo') return `aspect ratio ${aspect}`;
+                return `aspect ratio ${aspect}`;
+            },
+
+            normalizeListText(text) {
+                // Normalizes comma/newline separated lists and removes duplicates.
+                const items = (text || '')
+                    .split(/[,\n]+/)
+                    .map(s => s.trim())
+                    .filter(Boolean);
+                const seen = new Set();
+                const out = [];
+                for (const it of items) {
+                    const key = it.toLowerCase();
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    out.push(it);
+                }
+                return out;
+            },
+
+            buildPrompt() {
+                const s = this.state;
+                const subject = (s.subject || '').trim() || "[Subject Description]";
+                const setting = (s.scene?.setting || '').trim();
+                const action = (s.scene?.action || '').trim();
+                const composition = (s.scene?.composition || '').trim();
+                const mood = (s.scene?.mood || '').trim();
+                const color = (s.scene?.color || '').trim();
+
+                const styleBits = [s.style.cam, ...(s.style.light || []), s.style.film]
+                    .filter(Boolean)
+                    .map(x => String(x).trim())
+                    .filter(Boolean);
+
+                const customBits = Array.isArray(s.customIngredients) ? s.customIngredients.map(x => String(x).trim()).filter(Boolean) : [];
+                const aspectStr = this.formatAspectForModel((s.aspect || '').trim());
+
+                const uniq = (arr) => {
+                    const seen = new Set();
+                    const out = [];
+                    for (const it of arr) {
+                        const k = it.toLowerCase();
+                        if (seen.has(k)) continue;
+                        seen.add(k);
+                        out.push(it);
+                    }
+                    return out;
+                };
+
+                const details = uniq([composition, mood, color, ...customBits, ...styleBits].filter(Boolean));
+
+                let positive = '';
+
+                // --- Model-aware formatting presets ---
+                // Midjourney generally responds best to compact keyword lists.
+                const preferCompact = (s.model === 'midjourney') || (s.detailLevel === 'compact');
+
+                if (preferCompact) {
+                    const compactParts = [
+                        subject,
+                        setting ? `in ${setting}` : '',
+                        action ? action : '',
+                        ...details
+                    ].filter(Boolean);
+                    // MJ: avoid long sentences; keep tight comma-separated tokens.
+                    positive = compactParts.join(', ');
+                    // Aspect is appended later for MJ as flags.
+                } else {
+                    const sentences = [];
+                    // Sentence 1: core intent
+                    const s1 = [
+                        subject,
+                        setting ? `in ${setting}` : '',
+                        action ? `, ${action}` : ''
+                    ].join(' ').replace(/\s+/g, ' ').replace(/\s+,/g, ',').trim();
+                    if (s1) sentences.push(s1.endsWith('.') ? s1 : s1 + '.');
+
+                    // Sentence 2: composition + camera/motion
+                    const s2Parts = [];
+                    if (composition) s2Parts.push(composition);
+                    if (s.mode === 'video') {
+                        if (s.video.move) s2Parts.push(`Camera movement: ${s.video.move}`);
+                        if (s.video.dur) s2Parts.push(`Timing: ${s.video.dur}`);
+                    }
+                    if (s2Parts.length) sentences.push(s2Parts.join('. ') + '.');
+
+                    // Sentence 3: look + feel
+                    const lookParts = [];
+                    if (mood) lookParts.push(mood);
+                    if (color) lookParts.push(color);
+                    if (styleBits.length) lookParts.push(styleBits.join(', '));
+                    if (customBits.length) lookParts.push(customBits.join(', '));
+                    if (lookParts.length) sentences.push(lookParts.join('. ') + '.');
+
+                    // Sentence 4: detail booster (ultra only)
+                    if (s.detailLevel === 'ultra') {
+                        sentences.push('High fidelity detail, realistic textures, controlled highlights and shadows, clean edges.');
+                    }
+
+                    // For Stable/Veo/Generic: aspect reads better as plain language.
+                    if (aspectStr && s.model !== 'midjourney') sentences.push(aspectStr + '.');
+                    positive = sentences.join(' ').replace(/\s+/g, ' ').trim();
+                }
+
+                // MJ aspect flag handling
+                if (aspectStr && s.model === 'midjourney') {
+                    positive = `${positive} ${aspectStr}`.trim();
+                }
+
+                const negativeItems = this.normalizeListText(s.negative);
+                const negative = negativeItems.join(', ');
+
+                if (!negative) {
+                    return positive;
+                }
+
+                // Model-specific negative formatting
+                if (s.model === 'midjourney') {
+                    return `${positive} --no ${negative}`;
+                }
+                if (s.model === 'stable') {
+                    return `${positive}\nNegative prompt: ${negative}`;
+                }
+                // Generic/Veo
+                return `${positive}. Exclude: ${negative}`;
+            },
+
+            renderCustomIngredientChips() {
+                const el = document.getElementById('customIngredientChips');
+                if (!el) return;
+                el.innerHTML = '';
+                const items = Array.isArray(this.state.customIngredients) ? this.state.customIngredients : [];
+                if (items.length === 0) {
+                    const hint = document.createElement('div');
+                    hint.className = 'text-[10px] text-slate-400';
+                    hint.textContent = 'Add your own reusable micro-descriptors here.';
+                    el.appendChild(hint);
+                    return;
+                }
+
+                items.forEach((txt, idx) => {
+                    const chip = document.createElement('button');
+                    chip.className = 'text-[10px] bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full';
+                    chip.type = 'button';
+                    chip.title = 'Remove';
+                    chip.textContent = `${txt} ×`;
+                    chip.addEventListener('click', () => {
+                        this.state.customIngredients = this.state.customIngredients.filter((_, i) => i !== idx);
+                        this.saveStateNow();
+                        this.renderCustomIngredientChips();
+                        this.updatePrompt();
+                    });
+                    el.appendChild(chip);
+                });
+            },
+
+            addCustomIngredientFromUI() {
+                const input = document.getElementById('customIngredientInput');
+                if (!input) return;
+                const val = (input.value || '').trim();
+                if (!val) return;
+                const items = Array.isArray(this.state.customIngredients) ? this.state.customIngredients : [];
+                const exists = items.some(x => (x || '').toLowerCase() === val.toLowerCase());
+                if (!exists) items.push(val);
+                this.state.customIngredients = items;
+                input.value = '';
+                this.saveStateNow();
+                this.renderCustomIngredientChips();
+                this.updatePrompt();
+            },
+
+            updatePrompt() {
+                if(this.state.mode === 'sequence') return;
+
+                const prompt = this.buildPrompt();
+                document.getElementById('finalOutput').value = prompt;
+                document.getElementById('tokenCount').innerText = `${prompt.length} chars • ~${this.utils.approxTokens(prompt)} tokens`;
+                this.pushHistory(prompt);
+
+                this.renderQa(this.lintCurrent());
+            },
+
+            lintCurrent() {
+                const s = this.state;
+                const prompt = document.getElementById('finalOutput')?.value || '';
+                const issues = [];
+
+                const add = (severity, title, detail, fixId = null) => {
+                    issues.push({ severity, title, detail, fixId });
+                };
+
+                const subject = (s.subject || '').trim();
+                if (!subject) add('warn', 'Subject is empty', 'Add a clear subject description to reduce hallucinated details.', 'focus_subject');
+
+                const hasAnyStyle = Boolean(s.style.cam || (s.style.light || []).length || s.style.film || (s.customIngredients || []).length);
+                if (!hasAnyStyle) add('info', 'No visual ingredients selected', 'Consider adding camera/lighting/film/custom ingredients for consistent look.', 'set_detail_detailed');
+
+                if (s.mode === 'video') {
+                    const hasMotion = Boolean((s.video.move || '').trim());
+                    const hasAction = Boolean((s.scene?.action || '').trim() || subject.toLowerCase().match(/\b(walking|running|turning|looking|speaking|moving|dancing|fighting|flying)\b/));
+                    if (!hasMotion && !hasAction) add('warn', 'Video may feel static', 'Add an action or camera movement (push-in, pan, tracking) for better clips.', 'set_default_motion');
+                }
+
+                // Contradiction checks (simple but useful)
+                const allBits = [
+                    (s.scene?.composition || ''),
+                    ...(s.customIngredients || []),
+                    s.style.cam || '',
+                    s.style.film || ''
+                ].join(' ').toLowerCase();
+
+                if (allBits.includes('wide') && allBits.includes('macro')) {
+                    add('warn', 'Possible framing conflict', 'You have both “wide” and “macro”. Pick one framing style.', 'remove_macro_or_wide');
+                }
+
+                if ((s.scene?.composition || '').toLowerCase().includes('pov') && (s.style.cam || '').toLowerCase().includes('85mm')) {
+                    add('info', 'POV + portrait lens', 'POV often reads better with wider lenses (24–35mm). Not a hard rule.', null);
+                }
+
+                // MJ length guidance
+                if (s.model === 'midjourney' && prompt.length > 900) {
+                    add('warn', 'Prompt is long for Midjourney', 'Consider Compact detail level or fewer ingredients for better adherence.', 'set_detail_compact');
+                }
+
+                // Duplicate-ish ingredient detection
+                const norm = (t) => (t || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+                const tokens = norm(prompt).split(' ').filter(Boolean);
+                const freq = new Map();
+                for (const t of tokens) freq.set(t, (freq.get(t) || 0) + 1);
+                const noisy = ['the','a','an','and','or','of','in','to','with','for','on','at','by','from','is','are','shot','camera','movement','timing','aspect','ratio','negative','prompt','exclude'];
+                const repeats = Array.from(freq.entries())
+                    .filter(([k,v]) => v >= 4 && !noisy.includes(k))
+                    .sort((a,b) => b[1]-a[1])
+                    .slice(0, 3);
+                if (repeats.length) {
+                    add('info', 'Repetitive phrasing', `Repeated tokens: ${repeats.map(([k,v]) => `${k}×${v}`).join(', ')}`, 'dedupe_custom');
+                }
+
+                return issues;
+            },
+
+            renderQa(issues) {
+                const el = document.getElementById('qaList');
+                const scoreEl = document.getElementById('qaScore');
+                if (!el || !scoreEl) return;
+
+                const weights = { warn: 12, info: 4 };
+                const penalty = (issues || []).reduce((acc, it) => acc + (weights[it.severity] || 0), 0);
+                const score = Math.max(0, 100 - penalty);
+                scoreEl.textContent = `Score: ${score}`;
+
+                el.innerHTML = '';
+                if (!issues || issues.length === 0) {
+                    const ok = document.createElement('div');
+                    ok.className = 'text-sm text-slate-600 flex items-center gap-2';
+                    ok.innerHTML = '<i class="fa-solid fa-circle-check text-green-500"></i><span>Looks good. No obvious contradictions or missing fields.</span>';
+                    el.appendChild(ok);
+                    return;
+                }
+
+                const mk = (it) => {
+                    const row = document.createElement('div');
+                    row.className = 'flex items-start gap-3 p-2 rounded-lg border border-slate-200 bg-white';
+
+                    const icon = document.createElement('div');
+                    icon.className = 'shrink-0 mt-0.5';
+                    icon.innerHTML = it.severity === 'warn'
+                        ? '<i class="fa-solid fa-triangle-exclamation text-amber-500"></i>'
+                        : '<i class="fa-solid fa-circle-info text-indigo-500"></i>';
+
+                    const body = document.createElement('div');
+                    body.className = 'flex-1 min-w-0';
+
+                    const title = document.createElement('div');
+                    title.className = 'text-xs font-bold text-slate-700';
+                    title.textContent = it.title;
+
+                    const detail = document.createElement('div');
+                    detail.className = 'text-xs text-slate-500';
+                    detail.textContent = it.detail;
+
+                    body.appendChild(title);
+                    body.appendChild(detail);
+
+                    const actions = document.createElement('div');
+                    actions.className = 'shrink-0';
+
+                    if (it.fixId) {
+                        const btn = document.createElement('button');
+                        btn.className = 'text-[10px] bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-700 px-2 py-1 rounded';
+                        btn.textContent = 'Fix';
+                        btn.addEventListener('click', () => this.applyQaFix(it.fixId));
+                        actions.appendChild(btn);
+                    }
+
+                    row.appendChild(icon);
+                    row.appendChild(body);
+                    row.appendChild(actions);
+                    return row;
+                };
+
+                for (const it of issues) el.appendChild(mk(it));
+            },
+
+            applyQaFix(fixId) {
+                if (fixId === 'focus_subject') {
+                    document.getElementById('subjectInput')?.focus();
+                    return;
+                }
+                if (fixId === 'set_default_motion') {
+                    if (!this.state.video.move) {
+                        this.state.video.move = 'Slow Push In';
+                        const sel = document.getElementById('cameraMoveInput');
+                        if (sel) sel.value = 'Push In';
+                    }
+                    if (!this.state.scene.action) {
+                        this.state.scene.action = 'subtle natural motion, micro-expressions, gentle ambient movement';
+                        const inp = document.getElementById('actionInput');
+                        if (inp) inp.value = this.state.scene.action;
+                    }
+                    this.saveStateNow();
+                    this.updatePrompt();
+                    return;
+                }
+                if (fixId === 'set_detail_compact') {
+                    this.state.detailLevel = 'compact';
+                    const dl = document.getElementById('detailLevel');
+                    if (dl) dl.value = 'compact';
+                    this.saveStateNow();
+                    this.updatePrompt();
+                    return;
+                }
+                if (fixId === 'set_detail_detailed') {
+                    this.state.detailLevel = 'detailed';
+                    const dl = document.getElementById('detailLevel');
+                    if (dl) dl.value = 'detailed';
+                    this.saveStateNow();
+                    this.updatePrompt();
+                    return;
+                }
+                if (fixId === 'dedupe_custom') {
+                    const items = Array.isArray(this.state.customIngredients) ? this.state.customIngredients : [];
+                    const seen = new Set();
+                    this.state.customIngredients = items.filter(it => {
+                        const k = String(it || '').trim().toLowerCase();
+                        if (!k || seen.has(k)) return false;
+                        seen.add(k);
+                        return true;
+                    });
+                    this.saveStateNow();
+                    this.renderCustomIngredientChips();
+                    this.updatePrompt();
+                    return;
+                }
+                if (fixId === 'remove_macro_or_wide') {
+                    // Conservative fix: remove custom ingredient containing macro first.
+                    const items = Array.isArray(this.state.customIngredients) ? this.state.customIngredients : [];
+                    const idx = items.findIndex(x => String(x).toLowerCase().includes('macro'));
+                    if (idx >= 0) {
+                        items.splice(idx, 1);
+                        this.state.customIngredients = items;
+                        this.saveStateNow();
+                        this.renderCustomIngredientChips();
+                        this.updatePrompt();
+                    } else {
+                        alert('No “macro” custom ingredient found to remove. Adjust composition/ingredients manually.');
+                    }
+                    return;
+                }
+            },
+
+            applySafeQaFixes() {
+                const issues = this.lintCurrent();
+                // Apply only safe, non-destructive fixes.
+                const safe = new Set(['set_default_motion', 'set_detail_compact', 'set_detail_detailed', 'dedupe_custom']);
+                for (const it of issues) {
+                    if (it.fixId && safe.has(it.fixId)) this.applyQaFix(it.fixId);
+                }
+                this.renderQa(this.lintCurrent());
+            },
+
+            saveCharacter() {
+                const val = (this.state.subject || '').trim();
+                if(!val) return;
+
+                const saved = this.getCharacters();
+                const existing = saved.find(c => (c.text || '').trim() === val);
+                if (existing) {
+                    alert('This subject is already saved.');
+                    return;
+                }
+
+                const defaultName = val.length > 24 ? val.slice(0, 24) + '…' : val;
+                const name = (prompt('Name this subject (optional):', defaultName) || defaultName).trim() || defaultName;
+                saved.unshift({ id: String(Date.now()), text: val, name });
+                this.setCharacters(saved);
+                this.loadCharacters();
+            },
+
+            getCharacters() {
+                try {
+                    const raw = localStorage.getItem(this.constants.STORAGE_KEY_CHARS);
+                    const parsed = raw ? JSON.parse(raw) : [];
+                    return Array.isArray(parsed) ? parsed : [];
+                } catch {
+                    return [];
+                }
+            },
+
+            setCharacters(list) {
+                localStorage.setItem(this.constants.STORAGE_KEY_CHARS, JSON.stringify(Array.isArray(list) ? list : []));
+            },
+
+            loadCharacters() {
+                const saved = this.getCharacters();
+                const el = document.getElementById('characterSelect');
+                el.innerHTML = '';
+
+                const opt0 = document.createElement('option');
+                opt0.value = '';
+                opt0.textContent = 'Load...';
+                el.appendChild(opt0);
+
+                for (const c of saved) {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.name || '(unnamed)';
+                    el.appendChild(opt);
+                }
+            },
+
+            loadCharacterData(id) {
+                if(!id) return;
+                const saved = this.getCharacters();
+                const found = saved.find(c => c.id == id);
+                if(found) {
+                    this.state.subject = found.text;
+                    document.getElementById('subjectInput').value = found.text;
+                    this.saveStateDebounced();
+                    this.updatePrompt();
+                }
+            },
+
+            async copyToClip(text, btnId) {
+                const ok = await this.utils.copy(text);
+                if (!ok) {
+                    alert('Clipboard copy failed (browser permission).');
+                    return;
+                }
+                const btn = document.getElementById(btnId);
+                const old = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check text-green-500"></i>';
+                setTimeout(() => btn.innerHTML = old, 1500);
+            },
+
+            exportProject() {
+                const payload = {
+                    exportedAt: new Date().toISOString(),
+                    app: 'PromptStudio',
+                    version: 4,
+                    state: {
+                        ...this.state,
+                        // Do not export API key by default.
+                        apiKey: ''
+                    },
+                    characters: this.getCharacters()
+                };
+                this.utils.downloadJSON('promptstudio_project.json', payload);
+            },
+
+            async importProjectFromFile(e) {
+                const file = e.target.files && e.target.files[0];
+                e.target.value = '';
+                if (!file) return;
+                const text = await file.text();
+                const parsed = this.utils.safeJSONParse(text);
+                if (!parsed || typeof parsed !== 'object') {
+                    alert('Invalid JSON file.');
+                    return;
+                }
+                if (!confirm('Importing will overwrite current settings and subjects. Continue?')) return;
+
+                if (parsed.state && typeof parsed.state === 'object') {
+                    const incoming = parsed.state;
+                    this.state = {
+                        ...this.state,
+                        ...incoming,
+                        apiKey: this.state.apiKey,
+                        style: { ...this.state.style, ...(incoming.style || {}) },
+                        video: { ...this.state.video, ...(incoming.video || {}) }
+                    };
+                    this.saveStateNow();
+                }
+                if (Array.isArray(parsed.characters)) {
+                    this.setCharacters(parsed.characters);
+                    this.loadCharacters();
+                }
+
+                this.applyThemeToUI();
+                this.applyStateToUI();
+                this.updatePrompt();
+            },
+
+            openCharModal() {
+                document.getElementById('charModal').classList.remove('hidden');
+                document.getElementById('charSearch').value = '';
+                this.renderCharList('');
+            },
+
+            closeCharModal() {
+                document.getElementById('charModal').classList.add('hidden');
+            },
+
+            renderCharList(filterText) {
+                const q = (filterText || '').toLowerCase();
+                const list = this.getCharacters();
+                const el = document.getElementById('charList');
+                el.innerHTML = '';
+
+                const filtered = list.filter(c => {
+                    const name = (c.name || '').toLowerCase();
+                    const text = (c.text || '').toLowerCase();
+                    return !q || name.includes(q) || text.includes(q);
+                });
+
+                if (filtered.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'p-4 text-sm text-slate-400';
+                    empty.textContent = 'No saved subjects.';
+                    el.appendChild(empty);
+                    return;
+                }
+
+                for (const c of filtered) {
+                    const row = document.createElement('div');
+                    row.className = 'p-3 flex items-start gap-3';
+
+                    const left = document.createElement('div');
+                    left.className = 'flex-1 min-w-0';
+
+                    const name = document.createElement('input');
+                    name.className = 'w-full text-sm font-semibold text-slate-700 bg-transparent border border-slate-200 rounded-md px-2 py-1 mb-2';
+                    name.value = c.name || '';
+                    name.addEventListener('change', () => {
+                        const all = this.getCharacters();
+                        const idx = all.findIndex(x => x.id === c.id);
+                        if (idx >= 0) {
+                            all[idx].name = name.value.trim() || all[idx].name;
+                            this.setCharacters(all);
+                            this.loadCharacters();
+                        }
+                    });
+
+                    const preview = document.createElement('div');
+                    preview.className = 'text-xs text-slate-400 whitespace-pre-wrap break-words';
+                    preview.textContent = (c.text || '').slice(0, 240);
+
+                    left.appendChild(name);
+                    left.appendChild(preview);
+
+                    const right = document.createElement('div');
+                    right.className = 'shrink-0 flex flex-col gap-2';
+
+                    const loadBtn = document.createElement('button');
+                    loadBtn.className = 'text-xs bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded shadow-sm font-medium';
+                    loadBtn.textContent = 'Load';
+                    loadBtn.addEventListener('click', () => {
+                        this.state.subject = c.text || '';
+                        document.getElementById('subjectInput').value = this.state.subject;
+                        this.saveStateNow();
+                        this.updatePrompt();
+                        this.closeCharModal();
+                    });
+
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded shadow-sm';
+                    delBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+                    delBtn.title = 'Delete';
+                    delBtn.addEventListener('click', () => {
+                        if (!confirm('Delete this subject?')) return;
+                        const all = this.getCharacters().filter(x => x.id !== c.id);
+                        this.setCharacters(all);
+                        this.loadCharacters();
+                        this.renderCharList(document.getElementById('charSearch').value);
+                    });
+
+                    right.appendChild(loadBtn);
+                    right.appendChild(delBtn);
+
+                    row.appendChild(left);
+                    row.appendChild(right);
+                    el.appendChild(row);
+                }
+            },
+
+            clearAllCharacters() {
+                if (!confirm('Delete ALL saved subjects? This cannot be undone.')) return;
+                this.setCharacters([]);
+                this.loadCharacters();
+                this.renderCharList(document.getElementById('charSearch').value);
+            },
+
+            exportCharactersOnly() {
+                const payload = {
+                    exportedAt: new Date().toISOString(),
+                    app: 'PromptStudio',
+                    kind: 'subjects',
+                    version: 2,
+                    characters: this.getCharacters()
+                };
+                this.utils.downloadJSON('promptstudio_subjects.json', payload);
+            },
+
+            // --- AI Logic ---
+            
+            async runAI(type) {
+                if(!this.state.apiKey) return alert("Please enter API Key top right.");
+                
+                const loader = document.getElementById(type === 'polish' ? 'magicLoader' : 'seqLoader');
+                const btn = document.getElementById(type === 'polish' ? 'magicPolishBtn' : 'generateSeqBtn');
+                
+                btn.disabled = true;
+                loader.classList.remove('hidden');
+
+                try {
+                    let prompt = "";
+                    const styleStr = [this.state.style.cam, ...(this.state.style.light || []), this.state.style.film].filter(Boolean).join(', ');
+                    const customStr = Array.isArray(this.state.customIngredients) ? this.state.customIngredients.join(', ') : '';
+                    const sceneStr = [
+                        this.state.scene?.setting ? `Setting: ${this.state.scene.setting}` : '',
+                        this.state.scene?.action ? `Action: ${this.state.scene.action}` : '',
+                        this.state.scene?.composition ? `Composition: ${this.state.scene.composition}` : '',
+                        this.state.scene?.mood ? `Mood: ${this.state.scene.mood}` : '',
+                        this.state.scene?.color ? `Color: ${this.state.scene.color}` : ''
+                    ].filter(Boolean).join('\n');
+                    const systemContext = `You are an expert prompt engineer for image+video generation.
+Model target: ${this.state.model}.
+Subject: ${this.state.subject || ''}
+${sceneStr}
+Style: ${styleStr}
+Custom: ${customStr}
+Negative: ${this.state.negative || ''}
+Aspect: ${this.state.aspect || ''}`;
+
+                    if(type === 'polish') {
+                        prompt = `${systemContext}\n\nTask: Rewrite the prompt to be single-paragraph, highly detailed, focusing on lighting, texture, and motion. Make it production ready.`;
+                    } else {
+                        // Sequence Logic
+                        const narrative = document.getElementById('seqNarrative').value;
+                        const total = this.utils.clampInt(document.getElementById('seqTotalTime').value, 1, 600, 24);
+                        const clip = this.utils.clampInt(document.getElementById('seqClipTime').value, 1, 120, 6);
+                        const count = Math.max(1, Math.ceil(total/clip));
+                        
+                        prompt = `${systemContext}\n\nTask: Create a video sequence plan based on this Narrative Arc: "${narrative}".
+                        Split it into ${count} sequential clips of ${clip} seconds each.
+                        Return ONLY valid JSON (no markdown, no code fences):
+                        {
+                            "segments": [
+                                { "id": 1, "seconds": ${clip}, "action": "Brief action summary", "prompt": "Full detailed prompt including subject, style, and specific action for this shot" },
+                                ...
+                            ]
+                        }`;
+                    }
+
+                    const controller = new AbortController();
+                    const timeout = setTimeout(() => controller.abort(), 30000);
+
+                    const fetchWithRetry = async (attempt = 0) => {
+                        const res = await fetch(
+                            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${encodeURIComponent(this.state.apiKey)}`,
+                            {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({
+                                    contents: [{ parts: [{ text: prompt }] }],
+                                    generationConfig: type === 'sequence' ? { responseMimeType: "application/json" } : {}
+                                }),
+                                signal: controller.signal
+                            }
+                        );
+
+                        if ((res.status === 429 || res.status === 503) && attempt < 2) {
+                            const backoff = 400 * Math.pow(2, attempt);
+                            await new Promise(r => setTimeout(r, backoff));
+                            return fetchWithRetry(attempt + 1);
+                        }
+                        return res;
+                    };
+
+                    const res = await fetchWithRetry();
+                    clearTimeout(timeout);
+
+                    const data = await res.json();
+                    if(data.error) throw new Error(data.error.message);
+
+                    const resultText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (!resultText) throw new Error('Empty response from model.');
+
+                    if(type === 'polish') {
+                        document.getElementById('finalOutput').value = resultText;
+                        this.pushHistory(resultText);
+                        this.renderQa(this.lintCurrent());
+                    } else {
+                        const parsed = this.utils.safeJSONParse(resultText);
+                        if (!parsed || !Array.isArray(parsed.segments)) {
+                            throw new Error('Could not parse sequence JSON. Try again or simplify narrative.');
+                        }
+                        this.renderSequence(parsed.segments);
+                    }
+
+                } catch(e) {
+                    alert("AI Error: " + e.message);
+                } finally {
+                    btn.disabled = false;
+                    loader.classList.add('hidden');
+                }
+            },
+
+            renderSequence(segments) {
+                const container = document.getElementById('sequenceResults');
+                document.getElementById('seqToolbar').classList.remove('hidden');
+
+                container.innerHTML = '';
+                const aspectStr = this.formatAspectForModel((this.state.aspect || '').trim());
+
+                segments.forEach((seg, idx) => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex gap-4 group hover:border-indigo-300 transition-colors';
+
+                    const left = document.createElement('div');
+                    left.className = 'shrink-0 flex flex-col items-center pt-1';
+                    const badge = document.createElement('span');
+                    badge.className = 'bg-slate-800 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded mb-2';
+                    badge.textContent = String(idx + 1);
+                    const line = document.createElement('div');
+                    line.className = 'h-full w-px bg-slate-100 group-hover:bg-indigo-100';
+                    left.appendChild(badge);
+                    left.appendChild(line);
+
+                    const right = document.createElement('div');
+                    right.className = 'flex-1 min-w-0';
+
+                    const top = document.createElement('div');
+                    top.className = 'flex justify-between items-start mb-2';
+                    const h = document.createElement('h4');
+                    h.className = 'text-xs font-bold text-indigo-700 uppercase tracking-wide bg-indigo-50 px-2 py-0.5 rounded';
+                    h.textContent = (seg && seg.action) ? String(seg.action) : 'Scene';
+
+                    const copy = document.createElement('button');
+                    copy.className = 'text-slate-400 hover:text-indigo-600 transition-colors text-xs';
+                    copy.innerHTML = '<i class="fa-regular fa-copy"></i>';
+                    copy.title = 'Copy clip';
+                    copy.id = `seq_copy_${idx}`;
+
+                    const ta = document.createElement('textarea');
+                    ta.className = 'w-full text-sm text-slate-700 font-mono bg-slate-50 border border-slate-200 rounded p-3 focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-y';
+                    ta.rows = 3;
+
+                    const basePrompt = (seg && seg.prompt) ? String(seg.prompt) : '';
+                    ta.value = aspectStr ? `${basePrompt} ${aspectStr}`.trim() : basePrompt;
+                    copy.addEventListener('click', () => this.copyToClip(ta.value, copy.id));
+
+                    top.appendChild(h);
+                    top.appendChild(copy);
+                    right.appendChild(top);
+                    right.appendChild(ta);
+
+                    card.appendChild(left);
+                    card.appendChild(right);
+                    container.appendChild(card);
+                });
+            }
+        };
+
+        // --- Global Exports for HTML onclicks ---
+        window.downloadSequence = () => {
+            const lines = [];
+            document.querySelectorAll('#sequenceResults textarea').forEach((ta, i) => {
+                lines.push(`[Clip ${i+1}]\n${ta.value}\n`);
+            });
+            const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'prompt_sequence.txt';
+            a.click();
+        };
+
+        window.copyAllSequence = async () => {
+            const lines = [];
+            document.querySelectorAll('#sequenceResults textarea').forEach((ta, i) => {
+                lines.push(`Clip ${i+1}: ${ta.value}`);
+            });
+            const ok = await App.utils.copy(lines.join('\n\n'));
+            if (!ok) return alert('Clipboard copy failed (browser permission).');
+            alert("All clips copied to clipboard!");
+        };
+
+        window.App = App;
+        App.init();
+
+    </script>
+</body>
+</html>
