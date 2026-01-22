@@ -20,9 +20,11 @@ const StoryboardSection: React.FC<Props> = ({ projectData, updateProject, onNext
   const [loading, setLoading] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showStylePanel, setShowStylePanel] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleGenerateStoryboard = async () => {
     setLoading(true);
+    setError(null);
     try {
       const scenes = await generateStoryboard(
         projectData.content,
@@ -32,10 +34,16 @@ const StoryboardSection: React.FC<Props> = ({ projectData, updateProject, onNext
         projectData.setting,
         projectData.category
       );
+      if (scenes.length === 0) {
+        setError('No scenes were generated. Please check your content and try again.');
+        return;
+      }
       updateProject({ storyboard: scenes });
-    } catch (e) {
-      console.error(e);
-      alert("Failed to generate storyboard. Try again.");
+    } catch (e: any) {
+      console.error('Storyboard generation error:', e);
+      const errorMsg = e.message || 'Failed to generate sequences. Please try again.';
+      setError(errorMsg);
+      alert(`Error: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
@@ -142,6 +150,20 @@ const StoryboardSection: React.FC<Props> = ({ projectData, updateProject, onNext
           </button>
         </div>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 flex items-start space-x-3">
+          <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-600/30 flex items-center justify-center mt-0.5">
+            <span className="text-red-300 text-sm font-bold">!</span>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-red-300">Generation Issue</h3>
+            <p className="text-xs text-red-200 mt-1">{error}</p>
+            <p className="text-xs text-red-300/70 mt-2">💡 Try: reducing narrative length, simplifying context notes, or using shorter scene descriptions.</p>
+          </div>
+        </div>
+      )}
 
       {/* Style Selection Grid */}
       {showStylePanel && (
