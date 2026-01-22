@@ -229,52 +229,54 @@ export const generateStoryboard = async (
     throw new Error('Content is empty. Please provide narrative text to generate sequences.');
   }
 
-  const charContext = characters.map(c => `${c.name}: ${c.visualDescription}`).join('\n');
   const styleDesc = getStyleDescription(style);
 
-  // DYNAMIC SCENE COUNT: Adapt to content length and style
+  // DYNAMIC SCENE COUNT: Adapt to content length and style with AGGRESSIVE TOKEN REDUCTION
   const calculateOptimalSceneCount = (textLength: number, styleValue: StoryStyle): { min: number; max: number; target: number } => {
     // Estimate word count (roughly 5 chars per word)
     const wordCount = Math.ceil(textLength / 5);
     
-    // Base calculation: 1 scene per 500-1000 words depending on style
+    // AGGRESSIVE reduction: fewer scenes to save tokens
     let baseCount: number;
     
     if (styleValue === StoryStyle.DOCUMENTARY) {
-      // Documentary: more granular scenes (1 per 300-500 words)
-      baseCount = Math.ceil(wordCount / 400);
+      // Documentary: (1 per 600-800 words)
+      baseCount = Math.ceil(wordCount / 700);
     } else if (styleValue === StoryStyle.CINEMATIC_DRAMA) {
-      // Story-driven drama: balanced (1 per 500-800 words)
-      baseCount = Math.ceil(wordCount / 650);
+      // Drama: (1 per 800-1000 words)
+      baseCount = Math.ceil(wordCount / 900);
     } else if (styleValue === StoryStyle.GRITTY_REALISM || styleValue === StoryStyle.NEO_NOIR) {
-      // Intense narrative: more dynamic scenes (1 per 400-600 words)
-      baseCount = Math.ceil(wordCount / 500);
+      // Intense: (1 per 700-900 words)
+      baseCount = Math.ceil(wordCount / 800);
     } else if (styleValue === StoryStyle.ANIMATED_STYLIZED || styleValue === StoryStyle.FAIRYTALE) {
-      // Stylized: flexible pacing (1 per 450-700 words)
-      baseCount = Math.ceil(wordCount / 550);
+      // Stylized: (1 per 800-1000 words)
+      baseCount = Math.ceil(wordCount / 900);
     } else {
-      // Default: 1 scene per 600 words
-      baseCount = Math.ceil(wordCount / 600);
+      // Default: 1 scene per 850 words
+      baseCount = Math.ceil(wordCount / 850);
     }
     
-    // Enforce reasonable bounds
-    const min = Math.max(2, Math.min(baseCount - 1, 15)); // Min 2 scenes, max 15
-    const max = Math.min(baseCount + 2, 20);
-    const target = Math.min(baseCount, 18);
+    // Enforce reasonable bounds - REDUCED MAX from 18 to 12
+    const min = Math.max(2, Math.min(baseCount - 1, 12));
+    const max = Math.min(baseCount + 1, 14);
+    const target = Math.min(baseCount, 12);
     
     return { min, max, target };
   };
 
   const sceneCount = calculateOptimalSceneCount(content.length, style);
   
-  const MAX_CHAR_LENGTH = 15000; // Reduced to ensure room for response
+  const MAX_CHAR_LENGTH = 10000; // AGGRESSIVE reduction from 15000 to 10000
   let safeContent = content;
   if (content.length > MAX_CHAR_LENGTH) {
     // TRUNCATION HANDLING: Add context about truncation
-    safeContent = content.substring(0, MAX_CHAR_LENGTH) + "\n[NOTE: Content truncated. Focus on the narrative provided.]";
+    safeContent = content.substring(0, MAX_CHAR_LENGTH) + "\n[Truncated. Focus on provided text.]";
   }
 
-  // CONTEXT-AWARE PROMPT: Adapt instructions based on style and category
+  // COMPACT character context to reduce tokens
+  const charContext = characters.length > 0 
+    ? characters.map(c => `${c.name}: ${c.visualDescription.substring(0, 80)}`).join(' | ').substring(0, 300)
+    : 'None';
   const getCategoryGuidance = (cat: ProjectCategory): string => {
     switch(cat) {
       case ProjectCategory.BIBLICAL:
@@ -317,50 +319,20 @@ export const generateStoryboard = async (
     }
   };
   
-  const prompt = `You are a film director breaking narrative into video scenes.
+  const prompt = `Break narrative into ${sceneCount.target} key scenes. Each: number, durationSeconds (5-15), narrativeText (1-2 sentences), visualPrompt (40 words max), characterIds.
 
-CONTENT ANALYSIS:
-- Text length: ~${Math.ceil(content.length / 5)} words
-- Category: ${category}
-- Style: ${style} - ${styleDesc}
-- Setting: ${setting.landscape}, ${setting.year}
-- Available characters: ${characters.length > 0 ? characters.length + ' character(s)' : 'None specified'}
+STYLE: ${style}. ${getStyleTone(style)}
+CATEGORY: ${category}. ${getCategoryGuidance(category)}
+SETTING: ${setting.landscape}, ${setting.year}
+CHARS: ${charContext}
 
-SCENE BREAKDOWN INSTRUCTIONS:
-- Break narrative into ${sceneCount.min}-${sceneCount.target} cohesive scenes (adapt based on narrative flow)
-- Each scene 5-15 seconds duration
-- ${getCategoryGuidance(category)}
+FORMAT visualPrompt: "STYLE. [Key elements: X, Y. Mood: Z. Lighting: W.]"
+NO negatives, NO disclaimers. Just visuals.
 
-VISUAL STYLE GUIDANCE:
-- ${getStyleTone(style)}
+NARRATIVE:
+${safeContent}
 
-FOR EACH SCENE, PROVIDE:
-1. number: Sequential scene number (1, 2, 3...)
-2. narrativeText: 1-2 sentence summary of scene action/dialogue
-3. visualPrompt: Concise visual direction (max 50 words)
-   - Format: "STYLE_NAME. [Key visuals: X, Y, Z. Mood: description. Lighting: description.]"
-   - NEVER add negative prompts, quality disclaimers, or limitations
-   - Start with style, add essential visuals, lighting, and mood
-   - Example: "CINEMATIC_DRAMA. Marcus ascending marble steps in toga. Golden warm light, ancient Rome. Determined expression, slow steady pace."
-4. durationSeconds: 5-15 seconds (longer for complex scenes)
-5. characterIds: Array of character names appearing in scene (leave empty if none)
-
-CONTEXT NOTES: ${contextNote || 'None'}
-
-CHARACTER ROSTER:
-${charContext || 'No characters defined'}
-
-NARRATIVE TO BREAK DOWN:
-"${safeContent}"
-
-EDGE CASE HANDLING:
-- If narrative is very short (< 100 words), create 2-3 focused scenes
-- If narrative is very long, prioritize key turning points and climactic moments
-- If character is mentioned but not in roster, note the name anyway
-- If scene feels incomplete, extend to next logical beat rather than splitting arbitrarily
-- Adapt scene count to narrative pacing, not rigid limits
-
-OUTPUT: JSON array only. No preamble. No negative instructions.`;
+OUTPUT: JSON array only.`;
 
   try {
     const response = await ai.models.generateContent({
