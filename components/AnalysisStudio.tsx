@@ -3678,45 +3678,70 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
               {popupContent === 'inputStream' && (
                 <div className="space-y-6 max-w-5xl mx-auto">
                   {/* Input Source Buttons */}
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-5 gap-3">
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={processingFile || isRecording}
-                      className="flex flex-col items-center gap-2 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg border-2 border-neutral-200 dark:border-neutral-700 hover:border-neutral-500 dark:hover:border-neutral-400 transition-colors disabled:opacity-50"
+                      className="flex flex-col items-center gap-2 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg border-2 border-neutral-200 dark:border-neutral-700 hover:border-neutral-500 dark:hover:border-neutral-400 transition-colors disabled:opacity-50"
                     >
-                      <Upload className="w-6 h-6 text-neutral-500" />
-                      <span className="text-xs font-bold text-neutral-600 dark:text-neutral-300">Upload File</span>
-                      <span className="text-[10px] text-neutral-400">Video, Audio, SRT, VTT</span>
+                      <Upload className="w-5 h-5 text-neutral-500" />
+                      <span className="text-[10px] font-bold text-neutral-600 dark:text-neutral-300">Upload File</span>
+                      <span className="text-[8px] text-neutral-400">Video, Audio, SRT</span>
                     </button>
                     <button
                       onClick={() => setShowVideoSearch(true)}
                       disabled={processingFile || isRecording}
-                      className="flex flex-col items-center gap-2 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg border-2 border-neutral-200 dark:border-neutral-700 hover:border-red-500 dark:hover:border-red-400 transition-colors disabled:opacity-50"
+                      className="flex flex-col items-center gap-2 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg border-2 border-neutral-200 dark:border-neutral-700 hover:border-red-500 dark:hover:border-red-400 transition-colors disabled:opacity-50"
                     >
-                      <Youtube className="w-6 h-6 text-red-500" />
-                      <span className="text-xs font-bold text-neutral-600 dark:text-neutral-300">YouTube Search</span>
-                      <span className="text-[10px] text-neutral-400">Find videos by keyword</span>
+                      <Youtube className="w-5 h-5 text-red-500" />
+                      <span className="text-[10px] font-bold text-neutral-600 dark:text-neutral-300">YouTube</span>
+                      <span className="text-[8px] text-neutral-400">Search videos</span>
                     </button>
                     <button
                       onClick={isRecording ? stopMicrophoneRecording : startMicrophoneRecording}
                       disabled={processingFile}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors disabled:opacity-50 ${
+                      className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-colors disabled:opacity-50 ${
                         isRecording 
                           ? 'bg-red-50 dark:bg-red-900/20 border-red-500 animate-pulse' 
                           : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 hover:border-neutral-500'
                       }`}
                     >
                       {isRecording ? (
-                        <MicOff className="w-6 h-6 text-red-500" />
+                        <MicOff className="w-5 h-5 text-red-500" />
                       ) : (
-                        <Mic className="w-6 h-6 text-neutral-500" />
+                        <Mic className="w-5 h-5 text-neutral-500" />
                       )}
-                      <span className="text-xs font-bold text-neutral-600 dark:text-neutral-300">
-                        {isRecording ? 'Stop Recording' : 'Microphone'}
+                      <span className="text-[10px] font-bold text-neutral-600 dark:text-neutral-300">
+                        {isRecording ? 'Stop' : 'Microphone'}
                       </span>
-                      <span className="text-[10px] text-neutral-400">
-                        {isRecording ? 'Click to stop' : 'Live transcription'}
+                      <span className="text-[8px] text-neutral-400">
+                        {isRecording ? 'Recording...' : 'Live capture'}
                       </span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const pastedTranscript = window.prompt('📋 Paste your transcript here:\n\n(You can paste any text - transcript, script, or speech content)');
+                        if (pastedTranscript && pastedTranscript.trim().length > 10) {
+                          setTranscript(pastedTranscript.trim());
+                          setTranscriptError('');
+                          setInputMetadata({
+                            source: 'Manual Paste',
+                            duration: 0,
+                            language: 'auto',
+                            confidence: 1.0,
+                            wordCount: pastedTranscript.trim().split(/\s+/).length
+                          });
+                          console.log('✅ Manual transcript loaded:', pastedTranscript.length, 'characters');
+                        } else if (pastedTranscript !== null) {
+                          alert('Transcript is too short. Please paste at least 10 characters.');
+                        }
+                      }}
+                      disabled={processingFile || isRecording}
+                      className="flex flex-col items-center gap-2 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg border-2 border-neutral-200 dark:border-neutral-700 hover:border-blue-500 dark:hover:border-blue-400 transition-colors disabled:opacity-50"
+                    >
+                      <FileText className="w-5 h-5 text-blue-500" />
+                      <span className="text-[10px] font-bold text-neutral-600 dark:text-neutral-300">Paste Text</span>
+                      <span className="text-[8px] text-neutral-400">Manual input</span>
                     </button>
                     <button
                       onClick={() => {
@@ -3726,7 +3751,7 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                         setTranscriptError('');
                       }}
                       disabled={processingFile || isRecording || (!video && !transcript)}
-                      className="flex flex-col items-center gap-2 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg border-2 border-neutral-200 dark:border-neutral-700 hover:border-neutral-400 transition-colors disabled:opacity-50"
+                      className="flex flex-col items-center gap-2 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg border-2 border-neutral-200 dark:border-neutral-700 hover:border-neutral-400 transition-colors disabled:opacity-50"
                     >
                       <Trash2 className="w-6 h-6 text-neutral-400" />
                       <span className="text-xs font-bold text-neutral-600 dark:text-neutral-300">Clear Input</span>
