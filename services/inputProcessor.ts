@@ -266,15 +266,32 @@ export class InputProcessor {
     return parseInt(h) * 3600 + parseInt(m) * 60 + parseInt(s) + parseInt(ms) / 1000;
   }
 
+  /**
+   * Get the correct transcription endpoint URL
+   * Handles both Supabase Edge Functions and Vercel API routes
+   */
+  private getTranscribeEndpoint(): string {
+    const baseUrl = this.apiBaseUrl;
+    // Supabase Edge Functions use function name directly (not /api/ prefix)
+    if (baseUrl.includes('supabase.co/functions/v1')) {
+      return `${baseUrl}/api-transcribe`;
+    }
+    // Vercel/Netlify fallback
+    return `${baseUrl}/api/transcribe`;
+  }
+
   // ═══════════════════════════════════════════════════════════════
-  // 2b. AUDIO TRANSCRIPTION (via /api/transcribe endpoint)
+  // 2b. AUDIO TRANSCRIPTION (via transcribe endpoint)
   // ═══════════════════════════════════════════════════════════════
   private async transcribeAudioFile(file: File): Promise<ProcessedInput> {
     console.log(`🎙️ Transcribing audio: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
 
     const base64 = await this.fileToBase64(file);
+    const endpoint = this.getTranscribeEndpoint();
 
-    const response = await fetch(`${this.apiBaseUrl}/api/transcribe`, {
+    console.log(`📡 Using transcription endpoint: ${endpoint}`);
+
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -323,7 +340,7 @@ export class InputProcessor {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // 2c. VIDEO TRANSCRIPTION (via /api/transcribe endpoint)
+  // 2c. VIDEO TRANSCRIPTION (via transcribe endpoint)
   // ═══════════════════════════════════════════════════════════════
   private async transcribeVideoFile(file: File): Promise<ProcessedInput> {
     console.log(`🎬 Transcribing video: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
@@ -334,8 +351,11 @@ export class InputProcessor {
     }
 
     const base64 = await this.fileToBase64(file);
+    const endpoint = this.getTranscribeEndpoint();
 
-    const response = await fetch(`${this.apiBaseUrl}/api/transcribe`, {
+    console.log(`📡 Using transcription endpoint: ${endpoint}`);
+
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -384,32 +404,35 @@ export class InputProcessor {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // 3. MICROPHONE CAPTURE (Web Speech API)
+  // 3. MICROPHONE CAPTURE (Web Speech API with enhanced fallback)
   // ═══════════════════════════════════════════════════════════════
   startMicrophoneCapture(callbacks: MicrophoneCallbacks): MicrophoneSession {
-    // Check browser support
+    // Check browser support for Web Speech API
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      callbacks.onError('Speech recognition not supported in this browser. Please use Chrome, Edge, or Safari.');
-      return this.createInactiveSession();
+      console.warn('⚠️ Web Speech API not supported, attempting MediaRecorder fallback...');
+      return this.startMediaRecorderCapture(callbacks);
     }
 
-    console.log('🎤 Starting microphone capture...');
+    console.log('🎤 Starting microphone capture via Web Speech API...');
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'en-US';  // TODO: Make configurable
+    recognition.lang = navigator.language || 'en-US';  // Use browser language
     recognition.maxAlternatives = 1;
 
     let finalTranscript = '';
     const segments: TranscriptSegment[] = [];
     const startTime = Date.now();
     let isActive = true;
+    let restartAttempts = 0;
+    const MAX_RESTARTS = 3;
 
     recognition.onstart = () => {
-      console.log('🎤 Microphone active');
+      console.log('🎤 Microphone active - Web Speech API');
+      restartAttempts = 0; // Reset on successful start
     };
 
     recognition.onresult = (event: any) => {
@@ -442,37 +465,69 @@ export class InputProcessor {
       
       // Map error codes to user-friendly messages
       const errorMessages: Record<string, string> = {
-        'no-speech': 'No speech detected. Please speak into your microphone.',
-        'audio-capture': 'Microphone not found or not accessible.',
-        'not-allowed': 'Microphone access denied. Please allow microphone access and try again.',
-        'network': 'Network error during speech recognition.',
-        'aborted': 'Speech recognition was aborted.'
+        'no-speech': 'No speech detected. Listening...',
+        'audio-capture': 'Microphone not found or not accessible. Please check your microphone.',
+        'not-allowed': 'Microphone access denied. Please allow microphone access in your browser settings.',
+        'network': 'Network error during speech recognition. Please check your connection.',
+        'aborted': 'Speech recognition was aborted.',
+        'service-not-allowed': 'Speech recognition service not allowed. Try using Chrome browser.'
       };
 
-      callbacks.onError(errorMessages[event.error] || `Speech recognition error: ${event.error}`);
+      const errorMsg = errorMessages[event.error] || `Speech recognition error: ${event.error}`;
+      
+      // For 'no-speech' errors, don't stop - just notify and continue
+      if (event.error === 'no-speech') {
+        console.log('🎤 No speech detected, continuing to listen...');
+        // Auto-restart if still active
+        if (isActive && restartAttempts < MAX_RESTARTS) {
+          restartAttempts++;
+          try {
+            recognition.start();
+            console.log(`🎤 Auto-restarted recognition (attempt ${restartAttempts})`);
+          } catch (e) {
+            // Already running or stopped
+          }
+        }
+        return;
+      }
+      
+      callbacks.onError(errorMsg);
+      isActive = false;
     };
 
     recognition.onend = () => {
-      console.log('🎤 Microphone stopped');
-      isActive = false;
+      console.log('🎤 Recognition ended, isActive:', isActive);
+      // Auto-restart if still supposed to be active (continuous mode)
+      if (isActive && restartAttempts < MAX_RESTARTS) {
+        restartAttempts++;
+        try {
+          recognition.start();
+          console.log(`🎤 Auto-restarted recognition after end (attempt ${restartAttempts})`);
+        } catch (e) {
+          console.log('🎤 Could not restart, stopping');
+          isActive = false;
+        }
+      } else {
+        isActive = false;
+      }
     };
 
     // Start recognition
     try {
       recognition.start();
     } catch (err) {
-      callbacks.onError('Failed to start microphone. Please check permissions.');
+      callbacks.onError('Failed to start microphone. Please check permissions and try again.');
       return this.createInactiveSession();
     }
 
     return {
       stop: (): ProcessedInput => {
+        isActive = false; // Set first to prevent auto-restart
         try {
           recognition.stop();
         } catch (e) {
           // Already stopped
         }
-        isActive = false;
 
         const duration = (Date.now() - startTime) / 1000;
         console.log(`🎤 Recording stopped: ${duration.toFixed(1)}s, ${finalTranscript.split(/\s+/).length} words`);
@@ -492,6 +547,138 @@ export class InputProcessor {
       },
       isActive: () => isActive
     };
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 3b. MEDIARECORDER FALLBACK (for browsers without Web Speech API)
+  // ═══════════════════════════════════════════════════════════════
+  private startMediaRecorderCapture(callbacks: MicrophoneCallbacks): MicrophoneSession {
+    // Check for MediaRecorder support
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      callbacks.onError('Microphone access not supported in this browser. Please use a modern browser like Chrome, Firefox, or Edge.');
+      return this.createInactiveSession();
+    }
+
+    console.log('🎤 Starting MediaRecorder fallback capture...');
+
+    let mediaRecorder: MediaRecorder | null = null;
+    let audioChunks: Blob[] = [];
+    let isActive = true;
+    const startTime = Date.now();
+
+    // Request microphone access
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then((stream) => {
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunks.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstart = () => {
+          console.log('🎤 MediaRecorder started');
+          callbacks.onInterimTranscript('[Recording... Speech will be transcribed when stopped]');
+        };
+
+        mediaRecorder.onstop = async () => {
+          console.log('🎤 MediaRecorder stopped, transcribing...');
+          
+          // Stop all tracks
+          stream.getTracks().forEach(track => track.stop());
+          
+          if (audioChunks.length === 0) {
+            callbacks.onError('No audio recorded');
+            return;
+          }
+
+          // Create audio blob and transcribe
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          callbacks.onInterimTranscript('[Transcribing audio...]');
+
+          try {
+            const result = await this.transcribeRecordedAudio(audioBlob);
+            callbacks.onFinalTranscript(result.transcript);
+          } catch (error: any) {
+            callbacks.onError(`Transcription failed: ${error.message}`);
+          }
+        };
+
+        mediaRecorder.start(1000); // Collect data every second
+      })
+      .catch((err) => {
+        console.error('🎤 MediaRecorder error:', err);
+        callbacks.onError(`Microphone access failed: ${err.message}`);
+        isActive = false;
+      });
+
+    return {
+      stop: (): ProcessedInput => {
+        isActive = false;
+        
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+        }
+
+        const duration = (Date.now() - startTime) / 1000;
+        
+        return {
+          type: InputType.MICROPHONE_LIVE,
+          transcript: '[Transcription pending...]',
+          segments: [],
+          metadata: {
+            source: 'microphone-mediarecorder',
+            duration,
+            language: 'auto',
+            confidence: 0.8,
+            wordCount: 0
+          }
+        };
+      },
+      isActive: () => isActive
+    };
+  }
+
+  /**
+   * Transcribe recorded audio blob via API
+   */
+  private async transcribeRecordedAudio(audioBlob: Blob): Promise<{ transcript: string }> {
+    const base64 = await this.blobToBase64(audioBlob);
+    const endpoint = this.getTranscribeEndpoint();
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audio: base64,
+        mimeType: 'audio/webm',
+        options: {
+          includeTimestamps: true,
+          enableDiarization: false,
+          language: 'auto'
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Transcription failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return { transcript: result.transcript || '' };
+  }
+
+  private blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1] || '';
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   }
 
   private createInactiveSession(): MicrophoneSession {
