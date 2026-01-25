@@ -1271,7 +1271,27 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
     }
   };
 
+  // Check if we have valid input for analysis
+  const hasValidInput = React.useMemo(() => {
+    return !!(video || transcript || (ragUrls && ragUrls.trim().length > 0));
+  }, [video, transcript, ragUrls]);
+
   const runAnalysis = async () => {
+    // Warn if no input source
+    if (!hasValidInput) {
+      const proceed = window.confirm(
+        '⚠️ No input source detected!\n\n' +
+        'The AI will generate a demonstration analysis based on participant profiles only.\n\n' +
+        'For accurate analysis, please:\n' +
+        '• Upload a video/audio file\n' +
+        '• Search for a YouTube video\n' +
+        '• Record via microphone\n' +
+        '• Add RAG reference URLs\n\n' +
+        'Continue with demo analysis anyway?'
+      );
+      if (!proceed) return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -2084,7 +2104,37 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                                <History className="w-5 h-5 text-neutral-500" />
                              </div>
                              <p className="text-[10px] font-black text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">System Idle</p>
-                             <p className="text-[8px] font-medium text-neutral-400 dark:text-neutral-600 mt-1">Select input source</p>
+                             <p className="text-[8px] font-medium text-neutral-400 dark:text-neutral-600 mt-1 mb-4">Select input source below</p>
+                             
+                             {/* Quick Input Action Buttons */}
+                             <div className="flex gap-2 mt-2">
+                               <button
+                                 onClick={() => fileInputRef.current?.click()}
+                                 disabled={processingFile || isRecording}
+                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-600 hover:border-neutral-400 transition-colors disabled:opacity-50 text-[9px] font-bold text-neutral-600 dark:text-neutral-300"
+                               >
+                                 <Upload className="w-3 h-3" /> Upload
+                               </button>
+                               <button
+                                 onClick={() => setShowVideoSearch(true)}
+                                 disabled={processingFile || isRecording}
+                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-600 hover:border-red-400 transition-colors disabled:opacity-50 text-[9px] font-bold text-red-600 dark:text-red-400"
+                               >
+                                 <Youtube className="w-3 h-3" /> YouTube
+                               </button>
+                               <button
+                                 onClick={isRecording ? stopMicrophoneRecording : startMicrophoneRecording}
+                                 disabled={processingFile}
+                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50 text-[9px] font-bold ${
+                                   isRecording 
+                                     ? 'bg-red-100 dark:bg-red-900/30 border-red-500 text-red-600 animate-pulse' 
+                                     : 'bg-neutral-100 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-600 hover:border-neutral-400 text-neutral-600 dark:text-neutral-300'
+                                 }`}
+                               >
+                                 {isRecording ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                                 {isRecording ? 'Stop' : 'Record'}
+                               </button>
+                             </div>
                            </>
                          )}
                          <input ref={fileInputRef} type="file" className="hidden" accept="video/*,audio/*,.srt,.vtt,.txt" onChange={handleVideoUpload} />
@@ -2184,8 +2234,22 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                          <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
                          <span className="font-medium">This query defines analysis focus and depth. Select preset or write custom instructions. More specific = better results.</span>
                        </div>
-                         <button onClick={runAnalysis} disabled={loading} className="w-full bg-black hover:bg-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900 text-white flex items-center justify-center gap-3 py-4 rounded-lg font-black text-xs uppercase tracking-[0.3em] shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 group">
-                         {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5 group-hover:rotate-12 transition-transform" />} Execute Audit
+                       
+                       {/* Input Status Indicator */}
+                       {!hasValidInput && (
+                         <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-600/30 rounded-lg text-[9px] text-amber-700 dark:text-amber-400">
+                           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                           <span className="font-medium">No input source loaded. Upload video, search YouTube, or add RAG URLs for accurate analysis.</span>
+                         </div>
+                       )}
+                       
+                       <button onClick={runAnalysis} disabled={loading} className={`w-full flex items-center justify-center gap-3 py-4 rounded-lg font-black text-xs uppercase tracking-[0.3em] shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 group ${
+                         hasValidInput 
+                           ? 'bg-black hover:bg-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900 text-white' 
+                           : 'bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600 text-white'
+                       }`}>
+                         {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5 group-hover:rotate-12 transition-transform" />} 
+                         {hasValidInput ? 'Execute Audit' : 'Run Demo Analysis'}
                        </button>
                     </div>
                   </div>
