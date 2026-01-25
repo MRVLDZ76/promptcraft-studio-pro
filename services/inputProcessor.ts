@@ -286,57 +286,99 @@ export class InputProcessor {
   private async transcribeAudioFile(file: File): Promise<ProcessedInput> {
     console.log(`🎙️ Transcribing audio: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
 
+    // Supabase Edge Functions have a 6MB request body limit
+    // Base64 encoding increases size by ~33%, so max raw file size is ~4.5MB
+    const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // 4.5 MB
+    
+    if (file.size > MAX_FILE_SIZE) {
+      console.error(`❌ Audio file too large: ${(file.size / 1024 / 1024).toFixed(2)} MB (max: 4.5 MB)`);
+      throw new Error(
+        `Audio file is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). ` +
+        `Maximum size for transcription is 4.5 MB. ` +
+        `Please use a shorter audio clip or compress the file. ` +
+        `Alternatively, you can paste the transcript manually.`
+      );
+    }
+
     const base64 = await this.fileToBase64(file);
     const endpoint = this.getTranscribeEndpoint();
 
     console.log(`📡 Using transcription endpoint: ${endpoint}`);
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        audio: base64,
-        mimeType: file.type || 'audio/mpeg',
-        options: {
-          includeTimestamps: true,
-          enableDiarization: true,
-          language: 'auto'
-        }
-      })
-    });
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audio: base64,
+          mimeType: file.type || 'audio/mpeg',
+          options: {
+            includeTimestamps: true,
+            enableDiarization: true,
+            language: 'auto'
+          }
+        })
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Transcription failed: ${response.status} ${response.statusText}`);
+      // Handle specific error codes
+      if (response.status === 413 || response.status === 546) {
+        throw new Error(
+          'File too large for transcription service. ' +
+          'Please use a smaller file (under 4.5 MB) or paste the transcript manually.'
+        );
+      }
+
+      if (response.status === 429) {
+        throw new Error(
+          'Transcription service rate limited. Please try again in a few minutes.'
+        );
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Transcription failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success && result.error) {
+        throw new Error(result.error);
+      }
+
+      console.log(`✅ Audio transcribed: ${result.wordCount || 'unknown'} words, ${result.confidence ? (result.confidence * 100).toFixed(0) + '%' : 'unknown'} confidence`);
+
+      return {
+        type: InputType.FILE_AUDIO,
+        transcript: result.transcript || '',
+        segments: (result.segments || []).map((s: any) => ({
+          text: s.text,
+          start: s.start || 0,
+          end: s.end || 0,
+          speaker: s.speaker
+        })),
+        metadata: {
+          source: file.name,
+          duration: result.duration || 0,
+          language: result.language || 'en',
+          confidence: result.confidence || 0.85,
+          speakerCount: result.speakers?.length || 1,
+          wordCount: result.wordCount || result.transcript?.split(/\s+/).length || 0
+        },
+        raw: result
+      };
+    } catch (error: any) {
+      console.error('❌ Audio transcription error:', error);
+      
+      // Provide helpful error message
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        throw new Error(
+          'Network error during transcription. The file may be too large. ' +
+          'Try a smaller file or paste the transcript manually.'
+        );
+      }
+      
+      throw error;
     }
-
-    const result = await response.json();
-
-    if (!result.success && result.error) {
-      throw new Error(result.error);
-    }
-
-    console.log(`✅ Audio transcribed: ${result.wordCount || 'unknown'} words, ${result.confidence ? (result.confidence * 100).toFixed(0) + '%' : 'unknown'} confidence`);
-
-    return {
-      type: InputType.FILE_AUDIO,
-      transcript: result.transcript || '',
-      segments: (result.segments || []).map((s: any) => ({
-        text: s.text,
-        start: s.start || 0,
-        end: s.end || 0,
-        speaker: s.speaker
-      })),
-      metadata: {
-        source: file.name,
-        duration: result.duration || 0,
-        language: result.language || 'en',
-        confidence: result.confidence || 0.85,
-        speakerCount: result.speakers?.length || 1,
-        wordCount: result.wordCount || result.transcript?.split(/\s+/).length || 0
-      },
-      raw: result
-    };
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -345,8 +387,22 @@ export class InputProcessor {
   private async transcribeVideoFile(file: File): Promise<ProcessedInput> {
     console.log(`🎬 Transcribing video: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
 
-    // Check file size - warn if large
-    if (file.size > 25 * 1024 * 1024) {
+    // Supabase Edge Functions have a 6MB request body limit
+    // Base64 encoding increases size by ~33%, so max raw file size is ~4.5MB
+    const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // 4.5 MB
+    
+    if (file.size > MAX_FILE_SIZE) {
+      console.error(`❌ Video file too large: ${(file.size / 1024 / 1024).toFixed(2)} MB (max: 4.5 MB)`);
+      throw new Error(
+        `Video file is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). ` +
+        `Maximum size for transcription is 4.5 MB. ` +
+        `Please use a shorter video clip or compress the file. ` +
+        `Alternatively, you can paste the transcript manually.`
+      );
+    }
+
+    // Check file size - warn if approaching limit
+    if (file.size > 3 * 1024 * 1024) {
       console.warn('⚠️ Large video file. Transcription may take a while...');
     }
 
@@ -355,52 +411,80 @@ export class InputProcessor {
 
     console.log(`📡 Using transcription endpoint: ${endpoint}`);
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        video: base64,
-        mimeType: file.type || 'video/mp4',
-        options: {
-          includeTimestamps: true,
-          enableDiarization: true,
-          language: 'auto'
-        }
-      })
-    });
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          video: base64,
+          mimeType: file.type || 'video/mp4',
+          options: {
+            includeTimestamps: true,
+            enableDiarization: true,
+            language: 'auto'
+          }
+        })
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Video transcription failed: ${response.status} ${response.statusText}`);
+      // Handle specific error codes
+      if (response.status === 413 || response.status === 546) {
+        throw new Error(
+          'File too large for transcription service. ' +
+          'Please use a smaller file (under 4.5 MB) or paste the transcript manually.'
+        );
+      }
+
+      if (response.status === 429) {
+        throw new Error(
+          'Transcription service rate limited. Please try again in a few minutes.'
+        );
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Video transcription failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success && result.error) {
+        throw new Error(result.error);
+      }
+
+      console.log(`✅ Video transcribed: ${result.wordCount || 'unknown'} words`);
+
+      return {
+        type: InputType.FILE_VIDEO,
+        transcript: result.transcript || '',
+        segments: (result.segments || []).map((s: any) => ({
+          text: s.text,
+          start: s.start || 0,
+          end: s.end || 0,
+          speaker: s.speaker
+        })),
+        metadata: {
+          source: file.name,
+          duration: result.duration || 0,
+          language: result.language || 'en',
+          confidence: result.confidence || 0.80,
+          speakerCount: result.speakers?.length || 1,
+          wordCount: result.wordCount || result.transcript?.split(/\s+/).length || 0
+        },
+        raw: result
+      };
+    } catch (error: any) {
+      console.error('❌ Video transcription error:', error);
+      
+      // Provide helpful error message
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        throw new Error(
+          'Network error during transcription. The file may be too large. ' +
+          'Try a smaller file or paste the transcript manually.'
+        );
+      }
+      
+      throw error;
     }
-
-    const result = await response.json();
-
-    if (!result.success && result.error) {
-      throw new Error(result.error);
-    }
-
-    console.log(`✅ Video transcribed: ${result.wordCount || 'unknown'} words`);
-
-    return {
-      type: InputType.FILE_VIDEO,
-      transcript: result.transcript || '',
-      segments: (result.segments || []).map((s: any) => ({
-        text: s.text,
-        start: s.start || 0,
-        end: s.end || 0,
-        speaker: s.speaker
-      })),
-      metadata: {
-        source: file.name,
-        duration: result.duration || 0,
-        language: result.language || 'en',
-        confidence: result.confidence || 0.80,
-        speakerCount: result.speakers?.length || 1,
-        wordCount: result.wordCount || result.transcript?.split(/\s+/).length || 0
-      },
-      raw: result
-    };
   }
 
   // ═══════════════════════════════════════════════════════════════
