@@ -190,8 +190,20 @@ export const AnalysisStudio: React.FC = () => {
   // Arbiter Tuning Presets
   const [arbiterPreset, setArbiterPreset] = React.useState('custom');
   
-  // Fallacy Log Storage
-  const [fallacyLog, setFallacyLog] = React.useState<Array<{timestamp: Date, fallacy: string, speaker: string, impact: string}>>([]);
+  // Fallacy Log Storage - Enhanced with full metadata
+  const [fallacyLog, setFallacyLog] = React.useState<Array<{
+    id?: string;
+    timestamp: Date;
+    videoTimestamp?: number;
+    fallacy: string;
+    speaker: string;
+    speakerId?: string;
+    impact: string;
+    severity?: number;
+    type?: string;
+    quote?: string;
+    explanation?: string;
+  }>>([]);
   
   // Visual Display Mode
   const [visualMode, setVisualMode] = React.useState(true);
@@ -758,35 +770,61 @@ export const AnalysisStudio: React.FC = () => {
         })));
       }
       
-      // Extract fallacies from argument_nodes (new format has fallacy_type in nodes)
+      // Extract fallacies from the dedicated fallacies array (primary source)
+      const fallaciesFromDirect = (parsed.fallacies || []).map((f: any, idx: number) => ({
+        id: f.id || `fal_${idx + 1}`,
+        timestamp: f.timestamp ? new Date(Date.now() - (f.timestamp * 1000)) : new Date(),
+        videoTimestamp: f.timestamp || 0,
+        fallacy: `[${(f.type || 'FALLACY').toUpperCase()}] ${f.quote || ''} - ${f.explanation || ''}`,
+        speaker: f.speaker === 'A' ? pA.name : f.speaker === 'B' ? pB.name : f.speaker,
+        speakerId: f.speaker,
+        impact: String(f.score_deduction || -5),
+        severity: f.severity || 5,
+        type: f.type,
+        quote: f.quote,
+        explanation: f.explanation
+      }));
+      
+      // Also extract from argument_nodes as fallback (for backward compatibility)
       const fallaciesFromNodes = (parsed.argument_nodes || [])
         .filter((node: any) => node.fallacy_type || node.logic_status === 'FALLACY')
-        .map((node: any) => ({
+        .map((node: any, idx: number) => ({
+          id: `node_fal_${idx + 1}`,
           timestamp: new Date(),
+          videoTimestamp: node.timestamp_in || 0,
           fallacy: `[${(node.fallacy_type || 'FALLACY').toUpperCase()}] ${node.claim_text_full || node.claim_text_short}`,
-          speaker: node.speaker_id === 'A' ? 'Participant A' : 'Participant B',
+          speaker: node.speaker_id === 'A' ? pA.name : pB.name,
+          speakerId: node.speaker_id,
           impact: String(node.score_impact || -5),
           severity: Math.abs(node.score_impact || 5),
           type: node.fallacy_type,
-          quote: node.claim_text_short
+          quote: node.claim_text_short,
+          explanation: node.claim_text_full
         }));
       
-      // Also extract from parsed.fallacies if present
-      const fallaciesFromDirect = (parsed.fallacies || []).map((f: any) => ({
-        timestamp: new Date(),
-        fallacy: `[${(f.type || 'FALLACY').toUpperCase()}] ${f.quote || ''} - ${f.explanation || ''}`,
-        speaker: f.speaker === 'A' ? 'Participant A' : f.speaker === 'B' ? 'Participant B' : f.speaker,
-        impact: f.severity ? String(-f.severity * 5) : '-5',
-        severity: f.severity || 5,
-        type: f.type,
-        quote: f.quote
-      }));
+      // Prefer dedicated fallacies array, use nodes as supplement
+      // Deduplicate by quote to avoid counting same fallacy twice
+      const seenQuotes = new Set<string>();
+      const allFallacies = [...fallaciesFromDirect];
       
-      const allFallacies = [...fallaciesFromNodes, ...fallaciesFromDirect];
+      for (const nodeFallacy of fallaciesFromNodes) {
+        if (!seenQuotes.has(nodeFallacy.quote || '')) {
+          seenQuotes.add(nodeFallacy.quote || '');
+          allFallacies.push(nodeFallacy);
+        }
+      }
       
       if (allFallacies.length > 0) {
-        console.log(`📊 Extracted ${allFallacies.length} fallacies from structured response`);
+        console.log(`📊 Extracted ${allFallacies.length} fallacies (${fallaciesFromDirect.length} direct, ${fallaciesFromNodes.length} from nodes)`);
         setFallacyLog(allFallacies);
+      } else {
+        console.log('✅ No fallacies detected - clean logical argumentation');
+      }
+      
+      // Log final_verdict fallacy summary if available
+      if (parsed.final_verdict?.fallacy_count) {
+        console.log(`📊 Fallacy Summary: A=${parsed.final_verdict.fallacy_count.a || 0}, B=${parsed.final_verdict.fallacy_count.b || 0}`);
+        console.log(`📊 Total Deductions: A=${parsed.final_verdict.total_fallacy_deduction?.a || 0}, B=${parsed.final_verdict.total_fallacy_deduction?.b || 0}`);
       }
       
       // Extract claims if available
@@ -2985,12 +3023,39 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                     <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
                     <div className="flex-1 space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <p className="text-[9px] font-black text-red-500 uppercase tracking-tighter">Syllogistic Violation</p>
-                        <span className="text-[7px] font-medium text-neutral-400 dark:text-neutral-600">{entry.timestamp.toLocaleTimeString()}</span>
+                        <p className="text-[9px] font-black text-red-500 uppercase tracking-tighter">
+                          {entry.type || 'Syllogistic Violation'}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          {entry.videoTimestamp > 0 && (
+                            <span className="text-[7px] font-bold text-blue-500 bg-blue-50 dark:bg-blue-500/10 px-1.5 py-0.5 rounded">
+                              @{Math.floor(entry.videoTimestamp / 60)}:{String(Math.floor(entry.videoTimestamp % 60)).padStart(2, '0')}
+                            </span>
+                          )}
+                          {entry.severity && (
+                            <span className={`text-[7px] font-bold px-1.5 py-0.5 rounded ${
+                              entry.severity >= 8 ? 'bg-red-100 dark:bg-red-500/20 text-red-600' :
+                              entry.severity >= 5 ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-600' :
+                              'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600'
+                            }`}>
+                              SEV:{entry.severity}/10
+                            </span>
+                          )}
+                          <span className="text-[7px] font-medium text-neutral-400 dark:text-neutral-600">
+                            {entry.timestamp?.toLocaleTimeString?.() || 'N/A'}
+                          </span>
+                        </div>
                       </div>
-                      <p className="text-[10px] font-medium text-neutral-600 dark:text-neutral-400 leading-tight">{entry.fallacy}</p>
+                      {entry.quote && (
+                        <p className="text-[9px] font-medium text-neutral-500 dark:text-neutral-500 italic border-l-2 border-red-300 dark:border-red-500/30 pl-2">
+                          "{entry.quote}"
+                        </p>
+                      )}
+                      <p className="text-[10px] font-medium text-neutral-600 dark:text-neutral-400 leading-tight">{entry.explanation || entry.fallacy}</p>
                       <div className="flex items-center gap-3 text-[8px] font-bold">
-                        <span className="text-neutral-600 dark:text-neutral-300">{entry.speaker}</span>
+                        <span className={`px-1.5 py-0.5 rounded ${
+                          entry.speakerId === 'A' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-600' : 'bg-purple-100 dark:bg-purple-500/10 text-purple-600'
+                        }`}>{entry.speaker}</span>
                         {entry.impact !== '0' && <span className={`${entry.impact.startsWith('-') ? 'text-red-500' : 'text-neutral-500'}`}>{entry.impact} pts</span>}
                       </div>
                     </div>

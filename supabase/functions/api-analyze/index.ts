@@ -99,12 +99,44 @@ function buildAnalysisPrompt(config: {
     systemPrompt = '',
   } = config;
 
+  // Build calibration context with logic style guidance
+  const logicStyleGuidance: Record<string, string> = {
+    'Elite Peer Review': 'Apply rigorous academic peer review standards. Demand empirical evidence, proper citations, and methodological transparency. Flag unsupported claims.',
+    'Common Sense': 'Use everyday reasoning standards accessible to general audiences. Accept reasonable assumptions but flag obvious logical leaps.',
+    'Formal Logic': 'Apply strict formal logic rules. Evaluate syllogistic validity, truth tables, and propositional calculus. Penalize any invalid inference.',
+    'Scientific Method': 'Demand hypothesis-evidence-conclusion structure. Check for falsifiability, reproducibility claims, and statistical validity.',
+    'Legal Standard': 'Apply legal reasoning standards (preponderance of evidence, beyond reasonable doubt for strong claims). Evaluate precedent and analogical reasoning.',
+    'Dialectical': 'Use thesis-antithesis-synthesis framework. Evaluate how well arguments engage with opposing viewpoints.',
+  };
+
+  const stakeholderGuidance: Record<string, string> = {
+    'Expert-to-Expert': 'Assume technical audience. Allow jargon, expect domain expertise, penalize oversimplification.',
+    'Expert-to-Public': 'Evaluate ability to translate complex ideas. Reward clarity, penalize unnecessary complexity.',
+    'Public-to-Public': 'Apply accessible reasoning standards. Focus on common-sense validity over technical precision.',
+    'Academic-to-Policy': 'Evaluate policy implications. Check evidence-to-recommendation logic and feasibility claims.',
+  };
+
+  const calibrationBlock = `
+CALIBRATION PARAMETERS (APPLY THROUGHOUT ANALYSIS):
+═══════════════════════════════════════════════════
+• Region Context: ${calibration.country || 'Global'} (adjust cultural/regulatory references accordingly)
+• Temporal Context: ${calibration.year || '2026'} (evaluate claims against this timeframe)
+• Target Audience: ${calibration.demography || 'Universal'}
+• Arbiter Persona: ${calibration.persona || 'Neutral Arbiter'}
+• Logic Standard: ${calibration.logicStyle || 'Common Sense'}
+  → ${logicStyleGuidance[calibration.logicStyle] || logicStyleGuidance['Common Sense']}
+• Stakeholder Mode: ${calibration.stakeholderMode || 'Expert-to-Public'}
+  → ${stakeholderGuidance[calibration.stakeholderMode] || stakeholderGuidance['Expert-to-Public']}
+• Margin of Error: ${calibration.marginOfError || 10}% (tolerance for scoring edge cases)
+═══════════════════════════════════════════════════
+`;
+
   const enhancedSystemInstruction = `
 ${supervisorPrompt}
 
 ${systemPrompt}
 
-Calibration Context: Region=${calibration.country || 'Global'}, Year=${calibration.year || '2026'}, Demography=${calibration.demography || 'Universal'}, Persona=${calibration.persona || 'Neutral Arbiter'}, Logic Style=${calibration.logicStyle || 'Common Sense'}
+${calibrationBlock}
 `;
 
   return `
@@ -113,6 +145,7 @@ ${enhancedSystemInstruction}
 
 IDENTITY: You are "THE AI ARBITER". 
 TONE: Analytical, surgical, neutral but firm. Use "Sherlock-style" deduction logic.
+PERSONA: ${calibration.persona || 'Neutral Arbiter'}
 
 ${ragContext ? `RAG KNOWLEDGE CONTEXT:\n${ragContext}\n` : ''}
 
@@ -123,7 +156,7 @@ CONTENT (${wsdcWeights.content}% Weight - MAX ${wsdcWeights.content} points):
 - Logical quality of arguments and Toulmin structure validity
 - Soundness of evidence cited and relevance to motion
 - Internal consistency (penalize contradictions heavily)
-- Fallacy count (each fallacy deducts points)
+- Fallacy count (each fallacy deducts ${Math.round(wsdcWeights.content / 10)} points per fallacy)
 
 STYLE (${wsdcWeights.style}% Weight - MAX ${wsdcWeights.style} points):
 - Rhetorical effectiveness and persuasion techniques
@@ -136,6 +169,29 @@ STRATEGY (${wsdcWeights.strategy}% Weight - MAX ${wsdcWeights.strategy} points):
 - Effectiveness of refutations (attacking strongest points vs. strawmen)
 - Response to opponent's core arguments
 - Defensive vs. offensive balance
+
+FALLACY DETECTION PROTOCOL:
+You MUST identify and log ALL logical fallacies from these 12 categories:
+1. AD_HOMINEM - Attacking the person instead of the argument
+2. STRAWMAN - Misrepresenting opponent's position to attack a weaker version
+3. SLIPPERY_SLOPE - Claiming one event will lead to extreme consequences without justification
+4. FALSE_DILEMMA - Presenting only two options when more exist
+5. APPEAL_TO_AUTHORITY - Using authority figure as evidence without valid expertise
+6. HASTY_GENERALIZATION - Drawing broad conclusions from insufficient evidence
+7. POST_HOC - Assuming causation from correlation (post hoc ergo propter hoc)
+8. RED_HERRING - Introducing irrelevant information to distract from the issue
+9. CIRCULAR_REASONING - Using the conclusion as a premise (begging the question)
+10. APPEAL_TO_EMOTION - Manipulating emotions instead of using logic
+11. BANDWAGON - Arguing something is true because many people believe it
+12. NO_TRUE_SCOTSMAN - Dismissing counterexamples by redefining criteria
+
+For each fallacy detected, you MUST specify:
+- Exact timestamp (seconds)
+- Speaker (A or B)
+- Verbatim quote containing the fallacy
+- Fallacy type from the 12 categories above
+- Severity score (1-10, where 10 is most severe)
+- Impact on argument validity (-1 to -10 points)
 
 PARTICIPANTS:
 - Participant A: ${participantA.name} (${participantA.followers || '0'} followers, Level ${participantA.level || 1})
@@ -188,8 +244,20 @@ Required JSON Structure:
       "claim_text_full": "<complete argument>",
       "toulmin_component": "CLAIM" | "GROUNDS" | "WARRANT" | "BACKING" | "QUALIFIER" | "REBUTTAL",
       "logic_status": "VALID" | "FALLACY" | "WEAK_EVIDENCE" | "CONTRADICTION",
-      "fallacy_type": "Ad Hominem" | "Strawman" | null,
-      "score_impact": <number>
+      "fallacy_type": "<one of 12 fallacy types or null>",
+      "score_impact": <number positive for valid, negative for fallacy>
+    }
+  ],
+  "fallacies": [
+    {
+      "id": "fal_001",
+      "timestamp": <seconds>,
+      "speaker": "A" | "B",
+      "type": "AD_HOMINEM" | "STRAWMAN" | "SLIPPERY_SLOPE" | "FALSE_DILEMMA" | "APPEAL_TO_AUTHORITY" | "HASTY_GENERALIZATION" | "POST_HOC" | "RED_HERRING" | "CIRCULAR_REASONING" | "APPEAL_TO_EMOTION" | "BANDWAGON" | "NO_TRUE_SCOTSMAN",
+      "quote": "<exact verbatim quote containing the fallacy>",
+      "explanation": "<why this is a fallacy>",
+      "severity": <1-10>,
+      "score_deduction": <negative number>
     }
   ],
   "temporal_scores": [
@@ -201,22 +269,37 @@ Required JSON Structure:
     }
   ],
   "final_verdict": {
-    "summary": "<string>",
-    "key_fallacies": ["<string>"],
-    "strongest_argument": "<string>",
-    "weakest_argument": "<string>"
+    "summary": "<string - comprehensive analysis summary>",
+    "key_fallacies": ["<list of most impactful fallacies>"],
+    "fallacy_count": {
+      "a": <number of fallacies by participant A>,
+      "b": <number of fallacies by participant B>
+    },
+    "total_fallacy_deduction": {
+      "a": <total points deducted from A>,
+      "b": <total points deducted from B>
+    },
+    "strongest_argument": "<string - best argument made>",
+    "weakest_argument": "<string - worst argument made>",
+    "logic_quality": {
+      "a": "SOUND" | "WEAK" | "FALLACIOUS",
+      "b": "SOUND" | "WEAK" | "FALLACIOUS"
+    }
   },
   "chain_of_thought": "<string - your reasoning process>"
 }
 
 VALIDATION RULES:
-1. content.a + content.b must NOT exceed ${wsdcWeights.content} each
-2. style.a + style.b must NOT exceed ${wsdcWeights.style} each
-3. strategy.a + strategy.b must NOT exceed ${wsdcWeights.strategy} each
+1. content.a and content.b must NOT exceed ${wsdcWeights.content} each
+2. style.a and style.b must NOT exceed ${wsdcWeights.style} each
+3. strategy.a and strategy.b must NOT exceed ${wsdcWeights.strategy} each
 4. total.a = content.a + style.a + strategy.a (must equal sum)
 5. total.b = content.b + style.b + strategy.b (must equal sum)
 6. winner must be determined by comparing total.a vs total.b
 7. gamification.points_a and points_b are 0-100 scale (different from WSDC scores)
+8. fallacies array MUST contain ALL detected fallacies with full metadata
+9. Each fallacy MUST have a severity score (1-10) and score_deduction (negative)
+10. final_verdict.fallacy_count must match length of fallacies array per speaker
 
 Begin your analysis now. Output ONLY valid JSON.
 `;
