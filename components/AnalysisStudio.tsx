@@ -519,6 +519,13 @@ export const AnalysisStudio: React.FC = () => {
     
     setShowVideoSearch(false);
     
+    // Validate video ID before proceeding
+    if (!selectedVideo.video_id) {
+      console.error('❌ Invalid video selection: no video_id');
+      setTranscriptError('Invalid video selection. Please try another video.');
+      return;
+    }
+    
     // Fetch transcript automatically with caching
     setLoadingTranscript(true);
     setTranscriptError('');
@@ -530,6 +537,7 @@ export const AnalysisStudio: React.FC = () => {
         setTranscript(cachedTranscript.transcript_text);
       } else {
         // Fetch from API
+        console.log('🎬 Fetching transcript for video:', selectedVideo.video_id);
         const transcriptData = await getVideoTranscriptWithFallback(selectedVideo.video_id);
         setTranscript(transcriptData.full_transcript);
         console.log('✅ Transcript loaded:', transcriptData.full_transcript.length, 'characters');
@@ -547,8 +555,14 @@ export const AnalysisStudio: React.FC = () => {
       }
     } catch (error: any) {
       console.error('❌ Transcript fetch failed:', error);
-      setTranscriptError(error.message || 'Failed to load transcript');
+      const errorMsg = error.message || 'Failed to load transcript';
+      setTranscriptError(errorMsg);
       setTranscript('');
+      
+      // Show user-friendly message with options
+      if (errorMsg.includes('captions') || errorMsg.includes('transcript')) {
+        console.log('💡 Tip: You can manually paste the transcript or use a video with captions enabled');
+      }
     } finally {
       setLoadingTranscript(false);
     }
@@ -2216,9 +2230,32 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                                Fetching transcript...
                              </div>
                            ) : transcriptError ? (
-                             <div className="flex items-center gap-2 text-[8px] text-red-500">
-                               <AlertCircle className="w-3 h-3" />
-                               {transcriptError}
+                             <div className="space-y-2">
+                               <div className="flex items-center gap-2 text-[8px] text-red-500">
+                                 <AlertCircle className="w-3 h-3" />
+                                 {transcriptError}
+                               </div>
+                               <div className="flex items-center gap-2">
+                                 <button
+                                   onClick={() => {
+                                     const manualTranscript = window.prompt('Paste transcript manually:');
+                                     if (manualTranscript) {
+                                       setTranscript(manualTranscript);
+                                       setTranscriptError('');
+                                     }
+                                   }}
+                                   className="text-[7px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 underline"
+                                 >
+                                   Paste manually
+                                 </button>
+                                 <span className="text-[7px] text-neutral-400">or</span>
+                                 <button
+                                   onClick={() => setShowVideoSearch(true)}
+                                   className="text-[7px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 underline"
+                                 >
+                                   Try another video
+                                 </button>
+                               </div>
                              </div>
                            ) : transcript ? (
                              <div className="space-y-2">
@@ -3750,9 +3787,32 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                           Fetching transcript...
                         </div>
                       ) : transcriptError ? (
-                        <div className="flex items-center gap-3 text-sm text-red-500">
-                          <AlertCircle className="w-5 h-5" />
-                          {transcriptError}
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3 text-sm text-red-500">
+                            <AlertCircle className="w-5 h-5" />
+                            {transcriptError}
+                          </div>
+                          <div className="flex items-center gap-3 mt-2">
+                            <button
+                              onClick={() => {
+                                const manualTranscript = window.prompt('Paste your transcript here:');
+                                if (manualTranscript) {
+                                  setTranscript(manualTranscript);
+                                  setTranscriptError('');
+                                }
+                              }}
+                              className="text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 underline"
+                            >
+                              📋 Paste transcript manually
+                            </button>
+                            <span className="text-sm text-neutral-400">•</span>
+                            <button
+                              onClick={() => setShowVideoSearch(true)}
+                              className="text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 underline"
+                            >
+                              🔍 Search different video
+                            </button>
+                          </div>
                         </div>
                       ) : transcript ? (
                         <div className="space-y-3">

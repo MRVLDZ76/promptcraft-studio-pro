@@ -200,6 +200,82 @@ async function callGeminiForTranscription(
   return responseText;
 }
 
+/**
+ * Call Gemini API for YouTube URL transcription
+ * Uses Gemini's ability to analyze YouTube videos directly
+ */
+async function callGeminiForYouTubeTranscription(
+  youtubeUrl: string,
+  options: any
+): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+  const prompt = `You are a professional transcription service. Watch this YouTube video and transcribe ALL spoken content.
+
+VIDEO URL: ${youtubeUrl}
+
+TRANSCRIPTION REQUIREMENTS:
+- Transcribe ALL spoken words verbatim from the video
+- Include approximate timestamps for major sections
+- Identify different speakers if multiple (label as "A", "B", etc.)
+- Preserve filler words (um, uh, like) for authenticity
+- Note any non-speech sounds in [brackets] like [laughter], [applause]
+
+REQUIRED OUTPUT FORMAT (JSON):
+Return ONLY valid JSON with this structure:
+{
+  "transcript": "The complete transcription as a single string",
+  "segments": [
+    {"text": "Speaker text here", "start": 0.0, "end": 10.0, "speaker": "A"}
+  ],
+  "title": "Video title if visible",
+  "duration": 0,
+  "language": "detected language code",
+  "confidence": 0.9,
+  "speakers": ["A", "B"],
+  "wordCount": 500
+}
+
+Begin transcription:`;
+
+  const requestBody = {
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          { text: prompt }
+        ],
+      },
+    ],
+    generationConfig: {
+      responseMimeType: 'text/plain',
+      temperature: 0.1,
+      topP: 0.8,
+      maxOutputTokens: 8192,
+    },
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+  
+  if (!responseText) {
+    throw new Error('No response text from Gemini API');
+  }
+
+  return responseText;
+}
+
 // @ts-ignore - Deno.serve is available in Supabase Edge Functions runtime
 Deno.serve(async (req: Request) => {
   // Handle preflight OPTIONS request
@@ -214,14 +290,35 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { audio, video, mimeType, options = {} } = body;
+    const { audio, video, youtubeUrl, mimeType, options = {} } = body;
 
+    // Handle YouTube URL transcription
+    if (youtubeUrl) {
+      console.log(`🎬 Transcribing YouTube video: ${youtubeUrl}`);
+      
+      if (!GEMINI_API_KEY) {
+        return errorResponse('GEMINI_API_KEY not configured', 500);
+      }
+
+      const responseText = await callGeminiForYouTubeTranscription(youtubeUrl, options);
+      console.log('📝 YouTube transcription response received');
+      
+      const transcriptionResult = parseTranscriptionResponse(responseText);
+      
+      return jsonResponse({
+        success: true,
+        source: 'youtube',
+        ...transcriptionResult
+      });
+    }
+
+    // Handle audio/video file transcription
     if (!audio && !video) {
-      return errorResponse('No audio or video data provided', 400);
+      return errorResponse('No audio, video, or youtubeUrl provided', 400);
     }
 
     if (!mimeType) {
-      return errorResponse('mimeType is required', 400);
+      return errorResponse('mimeType is required for file transcription', 400);
     }
 
     if (!GEMINI_API_KEY) {
@@ -244,6 +341,7 @@ Deno.serve(async (req: Request) => {
 
     return jsonResponse({
       success: true,
+      source: 'file',
       ...transcriptionResult
     });
 

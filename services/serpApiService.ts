@@ -352,6 +352,11 @@ export async function getVideoTranscript(
   videoId: string,
   languageCode?: string
 ): Promise<TranscriptData> {
+  // Validate videoId
+  if (!videoId || videoId === 'undefined' || videoId === 'null') {
+    throw new Error('Invalid video ID. Please select a valid YouTube video.');
+  }
+
   const params: Record<string, string> = {
     v: videoId  // SerpAPI uses 'v' parameter, not 'video_id'
   };
@@ -394,18 +399,23 @@ export async function getVideoTranscript(
 
 /**
  * Get transcript with automatic retry for different languages
- * Tries in this order: default language -> preferred language -> Spanish -> English
+ * Tries in this order: default language -> preferred language -> Spanish -> English -> Gemini fallback
  */
 export async function getVideoTranscriptWithFallback(
   videoId: string,
   preferredLanguage?: string
 ): Promise<TranscriptData> {
+  // Validate video ID first
+  if (!videoId || videoId === 'undefined' || videoId === 'null') {
+    throw new Error('Invalid video ID. Please select a valid YouTube video.');
+  }
+
   // Try 1: Default language (whatever the video provides)
   try {
     console.log('Trying to get transcript in default language...');
     return await getVideoTranscript(videoId);
-  } catch (error) {
-    console.warn('Default language failed:', error);
+  } catch (error: any) {
+    console.warn('Default language failed:', error.message);
   }
 
   // Try 2: Preferred language if specified
@@ -413,8 +423,8 @@ export async function getVideoTranscriptWithFallback(
     try {
       console.log(`Trying preferred language: ${preferredLanguage}`);
       return await getVideoTranscript(videoId, preferredLanguage);
-    } catch (error) {
-      console.warn(`Preferred language ${preferredLanguage} failed:`, error);
+    } catch (error: any) {
+      console.warn(`Preferred language ${preferredLanguage} failed:`, error.message);
     }
   }
 
@@ -424,13 +434,75 @@ export async function getVideoTranscriptWithFallback(
     try {
       console.log(`Trying language: ${lang}`);
       return await getVideoTranscript(videoId, lang);
-    } catch (error) {
-      console.warn(`Language ${lang} failed:`, error);
+    } catch (error: any) {
+      console.warn(`Language ${lang} failed:`, error.message);
     }
   }
 
+  // Try 4: Gemini fallback - transcribe via AI
+  console.log('🤖 All SerpAPI attempts failed, trying Gemini fallback...');
+  try {
+    const geminiTranscript = await transcribeYouTubeWithGemini(videoId);
+    return geminiTranscript;
+  } catch (geminiError: any) {
+    console.warn('Gemini fallback failed:', geminiError.message);
+  }
+
   // All attempts failed
-  throw new Error('This video does not have captions/transcripts available. Please select a different video with captions enabled.');
+  throw new Error('This video does not have captions/transcripts available. You can:\n• Select a different video with captions enabled\n• Manually paste the transcript in the input field\n• Upload an audio/video file instead');
+}
+
+/**
+ * Fallback: Use Gemini to transcribe YouTube video
+ * Uses the api-transcribe Edge Function with YouTube URL
+ */
+async function transcribeYouTubeWithGemini(videoId: string): Promise<TranscriptData> {
+  const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  
+  // Use the api-transcribe endpoint
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://uuohwxcuqnaykpjhrcvu.supabase.co/functions/v1';
+  const endpoint = API_BASE_URL.includes('supabase.co/functions/v1')
+    ? `${API_BASE_URL}/api-transcribe`
+    : `${API_BASE_URL}/api/transcribe`;
+
+  console.log('🎬 Attempting Gemini transcription for:', youtubeUrl);
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      youtubeUrl,
+      options: {
+        includeTimestamps: true,
+        enableDiarization: true,
+        language: 'auto'
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini transcription failed: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  
+  if (!result.transcript) {
+    throw new Error('Gemini returned empty transcript');
+  }
+
+  // Convert to TranscriptData format
+  return {
+    transcript: result.segments || [{
+      text: result.transcript,
+      start: 0,
+      duration: 0
+    }],
+    full_transcript: result.transcript,
+    languages: [{ language: 'auto', language_code: 'auto' }],
+    video_id: videoId,
+    video_title: result.title
+  };
 }
 
 /**
