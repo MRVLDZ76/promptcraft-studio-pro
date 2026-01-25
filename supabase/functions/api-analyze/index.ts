@@ -229,7 +229,8 @@ async function callGeminiAPI(
   prompt: string,
   video?: { data: string; mimeType: string }
 ): Promise<any> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`;
+  // Use gemini-2.0-flash (stable and available model)
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
   // Build request body
   const parts: any[] = [];
