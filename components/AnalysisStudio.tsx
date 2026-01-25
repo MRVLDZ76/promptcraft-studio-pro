@@ -532,26 +532,57 @@ export const AnalysisStudio: React.FC = () => {
     try {
       // Check cache first
       const cachedTranscript = await getCachedVideoTranscript(selectedVideo.video_id);
-      if (cachedTranscript) {
+      if (cachedTranscript && cachedTranscript.transcript_text.length > 10) {
         console.log('✅ Using cached transcript:', cachedTranscript.transcript_text.length, 'characters');
         setTranscript(cachedTranscript.transcript_text);
       } else {
         // Fetch from API
         console.log('🎬 Fetching transcript for video:', selectedVideo.video_id);
         const transcriptData = await getVideoTranscriptWithFallback(selectedVideo.video_id);
+        
+        // Check if transcript is actually empty or too short
+        if (!transcriptData.full_transcript || transcriptData.full_transcript.length < 10) {
+          console.warn('⚠️ Transcript is empty or too short, prompting for manual input');
+          setTranscriptError('No transcript available for this video. You can paste the transcript manually or proceed without it.');
+          setTranscript('');
+          
+          // Prompt user for manual transcript
+          setTimeout(() => {
+            const shouldPaste = window.confirm(
+              `📋 No transcript found for "${selectedVideo.title}"\n\n` +
+              'This video may not have captions enabled.\n\n' +
+              'Options:\n' +
+              '• Click OK to paste a transcript manually\n' +
+              '• Click Cancel to proceed without transcript (AI will analyze video title and metadata only)'
+            );
+            
+            if (shouldPaste) {
+              const manualTranscript = window.prompt('Paste the transcript here:');
+              if (manualTranscript && manualTranscript.trim().length > 10) {
+                setTranscript(manualTranscript.trim());
+                setTranscriptError('');
+                console.log('✅ Manual transcript loaded:', manualTranscript.length, 'characters');
+              }
+            }
+          }, 100);
+          return;
+        }
+        
         setTranscript(transcriptData.full_transcript);
         console.log('✅ Transcript loaded:', transcriptData.full_transcript.length, 'characters');
         
-        // Cache for future use
-        await cacheVideoTranscript({
-          video_id: selectedVideo.video_id,
-          video_url: `https://www.youtube.com/watch?v=${selectedVideo.video_id}`,
-          title: selectedVideo.title,
-          channel_name: selectedVideo.channel?.name || '',
-          transcript_text: transcriptData.full_transcript,
-          language_code: typeof transcriptData.languages?.[0] === 'string' ? transcriptData.languages[0] : transcriptData.languages?.[0]?.language_code || 'en',
-          duration: '0'
-        });
+        // Cache for future use (only if valid)
+        if (transcriptData.full_transcript.length > 10) {
+          await cacheVideoTranscript({
+            video_id: selectedVideo.video_id,
+            video_url: `https://www.youtube.com/watch?v=${selectedVideo.video_id}`,
+            title: selectedVideo.title,
+            channel_name: selectedVideo.channel?.name || '',
+            transcript_text: transcriptData.full_transcript,
+            language_code: typeof transcriptData.languages?.[0] === 'string' ? transcriptData.languages[0] : transcriptData.languages?.[0]?.language_code || 'en',
+            duration: '0'
+          });
+        }
       }
     } catch (error: any) {
       console.error('❌ Transcript fetch failed:', error);

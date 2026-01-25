@@ -419,6 +419,11 @@ export async function getVideoTranscript(
     .join(' ')
     .trim();
 
+  // Check if the combined transcript is actually meaningful
+  if (fullTranscript.length < 10) {
+    throw new Error('Transcript is empty or contains no meaningful text. This video may have auto-generated captions that failed.');
+  }
+
   return {
     transcript: data.transcript,
     full_transcript: fullTranscript,
