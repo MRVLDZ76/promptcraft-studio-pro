@@ -714,6 +714,145 @@ export const AnalysisStudio: React.FC = () => {
   };
 
   const parseStats = (text: string) => {
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 1: Try to parse as direct JSON first (new API format)
+    // ═══════════════════════════════════════════════════════════════════════
+    let parsed: any = null;
+    
+    try {
+      // Try parsing the entire response as JSON
+      const trimmed = text.trim();
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        parsed = JSON.parse(trimmed);
+        console.log('✅ Parsed direct JSON response:', Object.keys(parsed));
+      }
+    } catch (e) {
+      // Not direct JSON, continue with legacy parsing
+    }
+    
+    // If we have direct JSON, process it immediately
+    if (parsed && (parsed.gamification || parsed.scores || parsed.argument_nodes)) {
+      console.log('🎯 Processing structured API response...');
+      
+      setExtractedJSON(parsed);
+      
+      // Extract gamification data
+      if (parsed.gamification) {
+        const g = parsed.gamification;
+        setArenaStats({
+          pointsA: g.points_a ?? 0,
+          pointsB: g.points_b ?? 0,
+          truthPot: g.truth_pot ?? '$0',
+          followersA: g.followers_a ?? '+0',
+          followersB: g.followers_b ?? '+0',
+          award: g.award ?? 'Master of Logic'
+        });
+      }
+      
+      // Extract temporal scores for visualization
+      if (parsed.temporal_scores && Array.isArray(parsed.temporal_scores)) {
+        setTemporalScores(parsed.temporal_scores.map((ts: any) => ({
+          time: ts.timestamp,
+          scoreA: ts.participant_a_score,
+          scoreB: ts.participant_b_score || 0
+        })));
+      }
+      
+      // Extract fallacies from argument_nodes (new format has fallacy_type in nodes)
+      const fallaciesFromNodes = (parsed.argument_nodes || [])
+        .filter((node: any) => node.fallacy_type || node.logic_status === 'FALLACY')
+        .map((node: any) => ({
+          timestamp: new Date(),
+          fallacy: `[${(node.fallacy_type || 'FALLACY').toUpperCase()}] ${node.claim_text_full || node.claim_text_short}`,
+          speaker: node.speaker_id === 'A' ? 'Participant A' : 'Participant B',
+          impact: String(node.score_impact || -5),
+          severity: Math.abs(node.score_impact || 5),
+          type: node.fallacy_type,
+          quote: node.claim_text_short
+        }));
+      
+      // Also extract from parsed.fallacies if present
+      const fallaciesFromDirect = (parsed.fallacies || []).map((f: any) => ({
+        timestamp: new Date(),
+        fallacy: `[${(f.type || 'FALLACY').toUpperCase()}] ${f.quote || ''} - ${f.explanation || ''}`,
+        speaker: f.speaker === 'A' ? 'Participant A' : f.speaker === 'B' ? 'Participant B' : f.speaker,
+        impact: f.severity ? String(-f.severity * 5) : '-5',
+        severity: f.severity || 5,
+        type: f.type,
+        quote: f.quote
+      }));
+      
+      const allFallacies = [...fallaciesFromNodes, ...fallaciesFromDirect];
+      
+      if (allFallacies.length > 0) {
+        console.log(`📊 Extracted ${allFallacies.length} fallacies from structured response`);
+        setFallacyLog(allFallacies);
+      }
+      
+      // Extract claims if available
+      if (parsed.claims && Array.isArray(parsed.claims)) {
+        const verifiedCount = parsed.claims.filter((c: any) => c.verified).length;
+        console.log(`📊 Extracted ${parsed.claims.length} claims (${verifiedCount} verified)`);
+      }
+      
+      // Extract fact verification report from RAG metadata
+      if (parsed.ragMetadata?.factVerificationReport) {
+        console.log('📊 Extracting fact verification report...');
+        setFactVerificationReport(parsed.ragMetadata.factVerificationReport);
+        setShowFactPanel(true);
+      }
+      
+      // Calculate scores using Scoring Engine
+      if (parsed.argument_nodes || parsed.claims || parsed.scores) {
+        try {
+          const engine = ScoringEngine.fromUserSettings({
+            marginOfError,
+            wsdcWeights
+          });
+          
+          // Use scores from API if available, otherwise calculate
+          const result = engine.calculateScores(
+            {
+              claims: parsed.claims || [],
+              fallacies: allFallacies.map(f => ({
+                type: f.type,
+                speaker: f.speaker.includes('A') ? 'A' : 'B',
+                severity: f.severity,
+                quote: f.quote || '',
+                explanation: f.fallacy
+              })),
+              wsdcScores: parsed.scores,
+              gamification: parsed.gamification
+            },
+            {
+              A: pA.name,
+              B: systemMode === 'arena' ? pB.name : undefined
+            }
+          );
+          
+          setScoringResult(result);
+          
+          console.log('✅ Scoring Engine completed:', {
+            winner: result.winner,
+            margin: result.winMargin?.toFixed(1) || 'N/A',
+            truthDensity: `${(result.overallTruthDensity || 0).toFixed(1)}%`,
+            fallacies: allFallacies.length
+          });
+          
+        } catch (scoringError) {
+          console.error('❌ Scoring Engine error:', scoringError);
+          // Still show basic scores from API
+        }
+      }
+      
+      return; // Exit early if we processed direct JSON
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // LEGACY PARSING: Text-based extraction for backward compatibility
+    // ═══════════════════════════════════════════════════════════════════════
+    console.log('📜 Falling back to legacy text parsing...');
+    
     // === GAMIFICATION DATA (Text-based extraction for backward compatibility) ===
     const pointsAMatch = text.match(/POINTS_A:\s*(\d+)/i)?.[1] || '0';
     const pointsBMatch = text.match(/POINTS_B:\s*(\d+)/i)?.[1] || '0';
@@ -743,7 +882,7 @@ export const AnalysisStudio: React.FC = () => {
       }
     }
     
-    // === STRUCTURED JSON EXTRACTION (Primary source for Scoring Engine) ===
+    // === STRUCTURED JSON EXTRACTION (Legacy format with markers) ===
     const jsonMatch = text.match(/JSON_OUTPUT_START\s*([\s\S]*?)\s*JSON_OUTPUT_END/);
     if (jsonMatch) {
       try {
@@ -1170,7 +1309,25 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
     }
   };
 
-  const reliability = result.match(/Reliability Rating:\s*(\d+)%/i)?.[1] || '0';
+  // Calculate reliability/truth density from multiple sources
+  const reliability = React.useMemo(() => {
+    // Priority 1: Scoring Engine result
+    if (scoringResult?.overallTruthDensity) {
+      return Math.round(scoringResult.overallTruthDensity);
+    }
+    // Priority 2: Extracted JSON claims
+    if (extractedJSON?.claims?.length > 0) {
+      const verified = extractedJSON.claims.filter((c: any) => c.verified).length;
+      return Math.round((verified / extractedJSON.claims.length) * 100);
+    }
+    // Priority 3: RAG metadata
+    if (extractedJSON?.ragMetadata?.factVerificationReport?.summary?.truthDensity) {
+      return Math.round(extractedJSON.ragMetadata.factVerificationReport.summary.truthDensity);
+    }
+    // Priority 4: Legacy text extraction
+    const match = result.match(/Reliability Rating:\s*(\d+)%/i);
+    return match ? match[1] : '0';
+  }, [scoringResult, extractedJSON, result]);
 
   return (
     <div className="flex flex-col h-full bg-neutral-50 dark:bg-neutral-950 text-neutral-800 dark:text-neutral-100 overflow-hidden font-sans">
