@@ -285,8 +285,16 @@ export const VideoSearchModal: React.FC<VideoSearchModalProps> = ({
                 {videos.map((video, index) => (
                   <div
                     key={index}
-                    onClick={() => onSelectVideo(video)}
-                    className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-500/20 overflow-hidden hover:shadow-xl hover:border-neutral-500/50 transition-all cursor-pointer group"
+                    onClick={() => {
+                      // Validate video_id before selection
+                      if (!video.video_id || video.video_id === 'undefined') {
+                        console.error('Invalid video selection - missing video_id:', video);
+                        setError('This video cannot be selected. Please try another one.');
+                        return;
+                      }
+                      onSelectVideo(video);
+                    }}
+                    className={`bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-500/20 overflow-hidden hover:shadow-xl hover:border-neutral-500/50 transition-all cursor-pointer group ${!video.video_id ? 'opacity-50' : ''}`}
                   >
                     <div className="flex gap-4 p-4">
                       {/* Thumbnail */}

@@ -209,6 +209,36 @@ export async function searchYouTube(
       throw new Error('SerpAPI search failed');
     }
 
+    // Ensure video_id is populated for all video results
+    // SerpAPI sometimes returns 'id' instead of 'video_id', or the video_id might be missing
+    if (data.video_results) {
+      data.video_results = data.video_results.map((video: any) => {
+        let videoId = video.video_id || video.id;
+        
+        // If still no video_id, extract from link
+        if (!videoId && video.link) {
+          videoId = extractYouTubeVideoId(video.link);
+        }
+        
+        return {
+          ...video,
+          video_id: videoId || '',
+          // Ensure thumbnail has static property
+          thumbnail: video.thumbnail?.static 
+            ? video.thumbnail 
+            : { static: video.thumbnail || 'https://via.placeholder.com/480x270?text=No+Thumbnail' }
+        };
+      });
+      
+      // Filter out any videos without valid video_id
+      const originalCount = data.video_results.length;
+      data.video_results = data.video_results.filter((video: YouTubeVideoResult) => video.video_id && video.video_id.length > 0);
+      
+      if (data.video_results.length < originalCount) {
+        console.warn(`Filtered out ${originalCount - data.video_results.length} videos without valid video_id`);
+      }
+    }
+
     return data;
   } catch (error) {
     console.error('SerpAPI search error:', error);
