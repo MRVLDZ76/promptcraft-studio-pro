@@ -4,6 +4,28 @@ import { Character, Scene, StoryStyle, ProjectCategory } from "../types";
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
+ * Progress callback type for streaming scene generation
+ */
+export type SceneProgressCallback = (update: {
+  phase: 'analyzing' | 'chunking' | 'generating' | 'complete' | 'error';
+  chunkIndex?: number;
+  totalChunks?: number;
+  scenesGenerated?: number;
+  currentScene?: Scene;
+  message: string;
+}) => void;
+
+/**
+ * Narrative chunk for processing
+ */
+interface NarrativeChunk {
+  index: number;
+  title: string;
+  content: string;
+  wordCount: number;
+}
+
+/**
  * Helper: Clean and Parse JSON from AI response
  * Handles markdown blocks and partial cleaning
  */
@@ -45,6 +67,112 @@ const cleanAndParseJson = (text: string | undefined, defaultValue: any) => {
     console.error("JSON Parse failed completely on text length:", text.length);
     return defaultValue;
   }
+};
+
+/**
+ * Helper: Split narrative into logical chunks for progressive processing
+ * Identifies blocks, parts, sections, or falls back to paragraph splitting
+ */
+const splitNarrativeIntoChunks = (content: string): NarrativeChunk[] => {
+  const chunks: NarrativeChunk[] = [];
+  
+  // Pattern 1: Explicit blocks (Block 1:, Block 2:, etc.)
+  const blockPattern = /(?:^|\n)((?:Block|Part|Section|Chapter|Scene)\s*\d*[:\-.]?\s*[^\n]*)\n([\s\S]*?)(?=(?:\n(?:Block|Part|Section|Chapter|Scene)\s*\d)|$)/gi;
+  let matches = [...content.matchAll(blockPattern)];
+  
+  if (matches.length >= 2) {
+    matches.forEach((match, idx) => {
+      const title = match[1].trim();
+      const body = match[2].trim();
+      if (body.length > 50) {
+        chunks.push({
+          index: idx,
+          title: title,
+          content: body,
+          wordCount: body.split(/\s+/).length
+        });
+      }
+    });
+    if (chunks.length >= 2) return chunks;
+  }
+  
+  // Pattern 2: Double newline paragraph groups (min 3 paragraphs per chunk)
+  const paragraphs = content.split(/\n\n+/).filter(p => p.trim().length > 30);
+  
+  if (paragraphs.length >= 3) {
+    const chunkSize = Math.ceil(paragraphs.length / Math.min(4, Math.ceil(paragraphs.length / 3)));
+    for (let i = 0; i < paragraphs.length; i += chunkSize) {
+      const group = paragraphs.slice(i, i + chunkSize);
+      const body = group.join('\n\n');
+      chunks.push({
+        index: chunks.length,
+        title: `Segment ${chunks.length + 1}`,
+        content: body,
+        wordCount: body.split(/\s+/).length
+      });
+    }
+    if (chunks.length >= 2) return chunks;
+  }
+  
+  // Pattern 3: Fallback - split by character count (~1500 chars per chunk)
+  const CHUNK_SIZE = 1500;
+  let remaining = content;
+  let idx = 0;
+  
+  while (remaining.length > 0) {
+    let splitPoint = Math.min(CHUNK_SIZE, remaining.length);
+    
+    // Try to split at sentence boundary
+    if (splitPoint < remaining.length) {
+      const sentenceEnd = remaining.lastIndexOf('. ', splitPoint);
+      if (sentenceEnd > CHUNK_SIZE * 0.5) splitPoint = sentenceEnd + 1;
+    }
+    
+    const chunk = remaining.substring(0, splitPoint).trim();
+    remaining = remaining.substring(splitPoint).trim();
+    
+    if (chunk.length > 50) {
+      chunks.push({
+        index: idx++,
+        title: `Segment ${idx}`,
+        content: chunk,
+        wordCount: chunk.split(/\s+/).length
+      });
+    }
+  }
+  
+  return chunks.length > 0 ? chunks : [{
+    index: 0,
+    title: 'Full Narrative',
+    content: content,
+    wordCount: content.split(/\s+/).length
+  }];
+};
+
+/**
+ * Helper: Calculate scenes per chunk based on word count
+ */
+const calculateScenesForChunk = (wordCount: number, style: StoryStyle): number => {
+  let wordsPerScene: number;
+  
+  switch (style) {
+    case StoryStyle.DOCUMENTARY:
+      wordsPerScene = 250;
+      break;
+    case StoryStyle.CINEMATIC_DRAMA:
+    case StoryStyle.NEO_NOIR:
+      wordsPerScene = 200;
+      break;
+    case StoryStyle.ANIMATED_STYLIZED:
+    case StoryStyle.FAIRYTALE:
+      wordsPerScene = 220;
+      break;
+    default:
+      wordsPerScene = 200;
+  }
+  
+  const count = Math.ceil(wordCount / wordsPerScene);
+  return Math.max(1, Math.min(count, 4)); // 1-4 scenes per chunk
 };
 
 /**
@@ -211,8 +339,9 @@ export const generateCharacterReference = async (character: Character, settingDe
 };
 
 /**
- * Step 3: Create Storyboard
- * OPTIMIZED: Dynamic scene count, context-aware prompt, comprehensive edge case handling
+ * Step 3: Create Storyboard - STREAMING CHUNKED APPROACH
+ * Processes narrative in logical chunks with real-time progress updates
+ * Each chunk generates 1-4 scenes independently, preventing timeouts
  */
 export const generateStoryboard = async (
   content: string, 
@@ -220,220 +349,220 @@ export const generateStoryboard = async (
   characters: Character[], 
   style: StoryStyle, 
   setting: any,
-  category: ProjectCategory
+  category: ProjectCategory,
+  onProgress?: SceneProgressCallback
 ): Promise<Scene[]> => {
   const ai = getAI();
+  const allScenes: Scene[] = [];
 
-  // EDGE CASE: Validate inputs
+  // VALIDATION
   if (!content || content.trim().length === 0) {
     throw new Error('Content is empty. Please provide narrative text to generate sequences.');
   }
 
-  const styleDesc = getStyleDescription(style);
-
-  // DYNAMIC SCENE COUNT: Adapt to content length and style with AGGRESSIVE TOKEN REDUCTION
-  const calculateOptimalSceneCount = (textLength: number, styleValue: StoryStyle): { min: number; max: number; target: number } => {
-    // Estimate word count (roughly 5 chars per word)
-    const wordCount = Math.ceil(textLength / 5);
-    
-    // AGGRESSIVE reduction: fewer scenes to save tokens
-    let baseCount: number;
-    
-    if (styleValue === StoryStyle.DOCUMENTARY) {
-      // Documentary: (1 per 600-800 words)
-      baseCount = Math.ceil(wordCount / 700);
-    } else if (styleValue === StoryStyle.CINEMATIC_DRAMA) {
-      // Drama: (1 per 800-1000 words)
-      baseCount = Math.ceil(wordCount / 900);
-    } else if (styleValue === StoryStyle.GRITTY_REALISM || styleValue === StoryStyle.NEO_NOIR) {
-      // Intense: (1 per 700-900 words)
-      baseCount = Math.ceil(wordCount / 800);
-    } else if (styleValue === StoryStyle.ANIMATED_STYLIZED || styleValue === StoryStyle.FAIRYTALE) {
-      // Stylized: (1 per 800-1000 words)
-      baseCount = Math.ceil(wordCount / 900);
-    } else {
-      // Default: 1 scene per 850 words
-      baseCount = Math.ceil(wordCount / 850);
-    }
-    
-    // Enforce reasonable bounds - REDUCED MAX from 18 to 12
-    const min = Math.max(2, Math.min(baseCount - 1, 12));
-    const max = Math.min(baseCount + 1, 14);
-    const target = Math.min(baseCount, 12);
-    
-    return { min, max, target };
+  const notify = (update: Parameters<SceneProgressCallback>[0]) => {
+    if (onProgress) onProgress(update);
   };
 
-  const sceneCount = calculateOptimalSceneCount(content.length, style);
-  
-  const MAX_CHAR_LENGTH = 10000; // AGGRESSIVE reduction from 15000 to 10000
-  let safeContent = content;
-  if (content.length > MAX_CHAR_LENGTH) {
-    // TRUNCATION HANDLING: Add context about truncation
-    safeContent = content.substring(0, MAX_CHAR_LENGTH) + "\n[Truncated. Focus on provided text.]";
-  }
+  notify({ phase: 'analyzing', message: 'Analyzing narrative structure...' });
 
-  // COMPACT character context to reduce tokens
+  // STEP 1: Split narrative into processable chunks
+  const chunks = splitNarrativeIntoChunks(content);
+  
+  notify({ 
+    phase: 'chunking', 
+    totalChunks: chunks.length,
+    message: `Identified ${chunks.length} narrative segments to process` 
+  });
+
+  const styleDesc = getStyleDescription(style);
+  
+  // Compact character context
   const charContext = characters.length > 0 
-    ? characters.map(c => `${c.name}: ${c.visualDescription.substring(0, 80)}`).join(' | ').substring(0, 300)
+    ? characters.map(c => `${c.name}: ${c.visualDescription.substring(0, 60)}`).join(' | ').substring(0, 250)
     : 'None';
+
   const getCategoryGuidance = (cat: ProjectCategory): string => {
     switch(cat) {
       case ProjectCategory.BIBLICAL:
-        return 'Maintain biblical accuracy and historical context. Emphasize divine moments and character revelations.';
+        return 'Biblical accuracy, historical reverence.';
       case ProjectCategory.HISTORICAL:
-        return 'Balance narrative pacing with historical accuracy. Use period-appropriate visual details and settings.';
-      case ProjectCategory.CUSTOM:
-        return 'Create engaging, visually compelling scenes that match the narrative tone and context.';
+        return 'Historical accuracy, period details.';
       default:
-        return 'Create engaging, visually compelling scenes that match the narrative tone.';
+        return 'Engaging, visually compelling.';
     }
   };
 
-  const getStyleTone = (styleValue: StoryStyle): string => {
-    switch(styleValue) {
-      case StoryStyle.DOCUMENTARY:
-        return 'Clear, informative, realistic visuals with natural lighting.';
-      case StoryStyle.CINEMATIC_DRAMA:
-        return 'Dramatic framing, emotional lighting, character-focused composition.';
-      case StoryStyle.ANIMATED_STYLIZED:
-        return 'Stylized, expressive visuals with artistic flair and vibrant colors.';
-      case StoryStyle.RETRO_FUTURISM:
-        return 'Retro-futuristic aesthetic with 70s-80s design elements and neon tones.';
-      case StoryStyle.GRITTY_REALISM:
-        return 'Raw, authentic, handheld-style visuals with natural imperfections.';
-      case StoryStyle.FAIRYTALE:
-        return 'Whimsical, magical, storybook-like visuals with warm golden tones.';
-      case StoryStyle.LOW_POLY_3D:
-        return 'Geometric, low-polygon 3D aesthetic with clean lines and modern design.';
-      case StoryStyle.VINTAGE_KODACHROME:
-        return 'Warm, faded vintage color palette reminiscent of 1950s-60s film stock.';
-      case StoryStyle.SURREAL_DREAMSCAPE:
-        return 'Dreamlike, abstract, surreal visuals with warped perspectives and ethereal atmosphere.';
-      case StoryStyle.PENCIL_SKETCH:
-        return 'Hand-drawn pencil sketch aesthetic with detailed line work and grayscale tones.';
-      case StoryStyle.NEO_NOIR:
-        return 'High contrast black and white, dramatic shadows, mysterious atmospheric lighting.';
-      default:
-        return 'Visually compelling and emotionally resonant.';
-    }
-  };
-  
-  const prompt = `Break narrative into ${sceneCount.target} key scenes. Each: number, durationSeconds (5-15), narrativeText (1-2 sentences), visualPrompt (40 words max), characterIds.
+  // STEP 2: Process each chunk independently with streaming
+  let globalSceneNumber = 1;
 
-STYLE: ${style}. ${getStyleTone(style)}
-CATEGORY: ${category}. ${getCategoryGuidance(category)}
-SETTING: ${setting.landscape}, ${setting.year}
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    const scenesForChunk = calculateScenesForChunk(chunk.wordCount, style);
+    
+    notify({
+      phase: 'generating',
+      chunkIndex: i + 1,
+      totalChunks: chunks.length,
+      scenesGenerated: allScenes.length,
+      message: `Processing "${chunk.title}" (${scenesForChunk} scene${scenesForChunk > 1 ? 's' : ''})...`
+    });
+
+    // Focused prompt for this chunk only
+    const chunkPrompt = `Generate exactly ${scenesForChunk} scene(s) for this narrative segment.
+
+SEGMENT: "${chunk.title}"
+STYLE: ${style} - ${styleDesc.substring(0, 100)}
+SETTING: ${setting.landscape || 'unspecified'}, ${setting.year || 'unspecified'}
 CHARS: ${charContext}
+GUIDANCE: ${getCategoryGuidance(category)}
 
-FORMAT visualPrompt: "STYLE. [Key elements: X, Y. Mood: Z. Lighting: W.]"
-NO negatives, NO disclaimers. Just visuals.
+OUTPUT FORMAT (JSON array):
+[{"number": ${globalSceneNumber}, "durationSeconds": 8, "narrativeText": "1-2 sentences", "visualPrompt": "40 words max", "characterIds": []}]
 
 NARRATIVE:
-${safeContent}
+${chunk.content}
 
-OUTPUT: JSON array only.`;
+Respond with JSON array only. No markdown.`;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              number: { type: Type.INTEGER },
-              durationSeconds: { type: Type.INTEGER },
-              narrativeText: { type: Type.STRING },
-              visualPrompt: { type: Type.STRING },
-              characterIds: { type: Type.ARRAY, items: { type: Type.STRING } }
-            }
+    try {
+      // Use streaming for progressive response
+      const stream = await ai.models.generateContentStream({
+        model: 'gemini-2.0-flash',
+        contents: chunkPrompt,
+      });
+
+      let fullResponse = '';
+      
+      for await (const partialResponse of stream) {
+        const text = partialResponse.text || '';
+        fullResponse += text;
+      }
+
+      // Parse scenes from this chunk
+      const chunkScenes = cleanAndParseJson(fullResponse, []);
+      
+      if (Array.isArray(chunkScenes) && chunkScenes.length > 0) {
+        for (const s of chunkScenes) {
+          if (s.narrativeText?.trim() && s.visualPrompt?.trim()) {
+            const scene: Scene = {
+              ...s,
+              id: crypto.randomUUID(),
+              number: globalSceneNumber++,
+              status: 'pending' as const,
+              durationSeconds: Math.max(5, Math.min(15, s.durationSeconds || 8)),
+              characterIds: (s.characterIds || [])
+                .map((name: string) => {
+                  const found = characters.find(c => 
+                    name.toLowerCase().includes(c.name.toLowerCase()) ||
+                    c.name.toLowerCase().includes(name.toLowerCase())
+                  );
+                  return found ? found.id : null;
+                })
+                .filter((id): id is string => id !== null)
+            };
+            
+            allScenes.push(scene);
+            
+            notify({
+              phase: 'generating',
+              chunkIndex: i + 1,
+              totalChunks: chunks.length,
+              scenesGenerated: allScenes.length,
+              currentScene: scene,
+              message: `Scene ${scene.number} generated`
+            });
           }
         }
       }
-    });
 
-    // CHECK FOR MAX_TOKENS FINISH REASON
-    if ((response.candidates?.[0] as any)?.finishReason === 'MAX_TOKENS') {
-      console.warn('⚠️ Gemini hit MAX_TOKENS limit. Attempting truncation recovery...');
-      
-      // Try to parse partial response
-      let rawScenes = cleanAndParseJson(response.text, []);
-      
-      if (rawScenes.length === 0) {
-        throw new Error('API response was truncated. Please shorten your narrative or reduce context notes and try again.');
+      // Small delay between chunks to avoid rate limiting
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
-      
-      // Partial recovery: validate and clean truncated scenes
-      rawScenes = rawScenes.filter((s: any) => 
-        s.number !== undefined && 
-        s.narrativeText?.trim() && 
-        s.visualPrompt?.trim()
-      );
-      
-      if (rawScenes.length === 0) {
-        throw new Error('Could not recover valid scenes from truncated response. Try with shorter content.');
-      }
-      
-      console.log(`✓ Recovered ${rawScenes.length} scenes from partial response`);
-      
-      return rawScenes.map((s: any) => ({
-        ...s,
-        id: crypto.randomUUID(),
-        status: 'pending' as const,
-        durationSeconds: Math.max(5, Math.min(15, s.durationSeconds || 10)),
-        characterIds: (s.characterIds || [])
-          .map((name: string) => {
-            const found = characters.find(c => name.toLowerCase().includes(c.name.toLowerCase()));
-            return found ? found.id : null;
-          })
-          .filter((id): id is string => id !== null)
-      }));
-    }
 
-    const rawScenes = cleanAndParseJson(response.text, []);
-    
-    if (rawScenes.length === 0) {
-      throw new Error('No scenes were generated. Please ensure your narrative has enough detail for scene breakdown.');
+    } catch (chunkError: any) {
+      console.warn(`⚠️ Chunk ${i + 1} failed: ${chunkError.message}. Continuing...`);
+      
+      notify({
+        phase: 'generating',
+        chunkIndex: i + 1,
+        totalChunks: chunks.length,
+        scenesGenerated: allScenes.length,
+        message: `Chunk ${i + 1} had issues, continuing with next...`
+      });
+      
+      // Continue with other chunks even if one fails
+      continue;
     }
+  }
 
-    // VALIDATION: Ensure all scenes meet minimum requirements
-    const validScenes = rawScenes.filter((s: any) => 
-      s.number !== undefined && 
-      s.narrativeText?.trim() && 
-      s.visualPrompt?.trim()
-    );
+  // VALIDATION
+  if (allScenes.length === 0) {
+    throw new Error('No scenes were generated. Please check your narrative content and try again.');
+  }
 
-    if (validScenes.length === 0) {
-      throw new Error('Generated scenes were incomplete. Please try again with more detailed content.');
-    }
-    
-    return validScenes.map((s: any) => ({
+  notify({
+    phase: 'complete',
+    scenesGenerated: allScenes.length,
+    message: `Successfully generated ${allScenes.length} scenes`
+  });
+
+  return allScenes;
+};
+
+/**
+ * Step 3 Alternative: Single-shot storyboard for short content
+ * Use this for narratives under 500 words
+ */
+export const generateStoryboardQuick = async (
+  content: string,
+  characters: Character[],
+  style: StoryStyle,
+  setting: any,
+  category: ProjectCategory
+): Promise<Scene[]> => {
+  const ai = getAI();
+  
+  if (!content || content.trim().length === 0) {
+    throw new Error('Content is empty.');
+  }
+
+  const wordCount = content.split(/\s+/).length;
+  const sceneCount = Math.max(1, Math.min(4, Math.ceil(wordCount / 150)));
+  
+  const styleDesc = getStyleDescription(style);
+  const charContext = characters.length > 0 
+    ? characters.map(c => `${c.name}: ${c.visualDescription.substring(0, 50)}`).join(' | ')
+    : 'None';
+
+  const prompt = `Generate ${sceneCount} scenes. JSON array only.
+STYLE: ${style}
+SETTING: ${setting.landscape}, ${setting.year}
+CHARS: ${charContext}
+
+Format: [{"number":1,"durationSeconds":8,"narrativeText":"...","visualPrompt":"...","characterIds":[]}]
+
+TEXT:
+${content.substring(0, 2000)}`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.0-flash',
+    contents: prompt,
+  });
+
+  const rawScenes = cleanAndParseJson(response.text, []);
+  
+  return rawScenes
+    .filter((s: any) => s.narrativeText?.trim() && s.visualPrompt?.trim())
+    .map((s: any, idx: number) => ({
       ...s,
       id: crypto.randomUUID(),
+      number: idx + 1,
       status: 'pending' as const,
-      durationSeconds: Math.max(5, Math.min(15, s.durationSeconds || 10)),
-      characterIds: (s.characterIds || [])
-        .map((name: string) => {
-          const found = characters.find(c => name.toLowerCase().includes(c.name.toLowerCase()));
-          return found ? found.id : null;
-        })
-        .filter((id): id is string => id !== null)
+      durationSeconds: Math.max(5, Math.min(15, s.durationSeconds || 8)),
+      characterIds: []
     }));
-    
-  } catch (error: any) {
-    console.error('❌ Storyboard generation error:', error.message);
-    
-    // EDGE CASE: Provide helpful error context
-    if (error.message.includes('MAX_TOKENS') || error.message.includes('truncated')) {
-      throw new Error(`${error.message} Suggestion: reduce narrative length or context notes.`);
-    }
-    
-    throw new Error(`Failed to generate sequences: ${error.message || 'Unknown error. Try again.'}`);
-  }
 };
 
 /**

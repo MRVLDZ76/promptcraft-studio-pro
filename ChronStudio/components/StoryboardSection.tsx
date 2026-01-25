@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ProjectData, StoryStyle } from '../types';
-import { generateStoryboard } from '../services/geminiService';
+import { generateStoryboard, SceneProgressCallback } from '../services/geminiService';
 import { 
   ArrowRightIcon, 
   FilmIcon, 
@@ -9,6 +9,14 @@ import {
   SwatchIcon,
   CheckCircleIcon
 } from '@heroicons/react/24/outline';
+
+interface ProgressState {
+  phase: string;
+  message: string;
+  chunkIndex?: number;
+  totalChunks?: number;
+  scenesGenerated?: number;
+}
 
 interface Props {
   projectData: ProjectData;
@@ -21,19 +29,44 @@ const StoryboardSection: React.FC<Props> = ({ projectData, updateProject, onNext
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showStylePanel, setShowStylePanel] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<ProgressState | null>(null);
 
   const handleGenerateStoryboard = async () => {
     setLoading(true);
     setError(null);
+    setProgress({ phase: 'starting', message: 'Initializing sequence generation...' });
+    
     try {
+      const onProgress: SceneProgressCallback = (update) => {
+        setProgress({
+          phase: update.phase,
+          message: update.message,
+          chunkIndex: update.chunkIndex,
+          totalChunks: update.totalChunks,
+          scenesGenerated: update.scenesGenerated
+        });
+        
+        // Update storyboard progressively as scenes are generated
+        if (update.currentScene && update.scenesGenerated) {
+          updateProject(prev => ({
+            storyboard: [...(prev?.storyboard || []), update.currentScene!]
+          }));
+        }
+      };
+
+      // Clear existing storyboard before generating
+      updateProject({ storyboard: [] });
+      
       const scenes = await generateStoryboard(
         projectData.content,
         projectData.contextNote,
         projectData.characters,
         projectData.style,
         projectData.setting,
-        projectData.category
+        projectData.category,
+        onProgress
       );
+      
       if (scenes.length === 0) {
         setError('No scenes were generated. Please check your content and try again.');
         return;
@@ -43,9 +76,9 @@ const StoryboardSection: React.FC<Props> = ({ projectData, updateProject, onNext
       console.error('Storyboard generation error:', e);
       const errorMsg = e.message || 'Failed to generate sequences. Please try again.';
       setError(errorMsg);
-      alert(`Error: ${errorMsg}`);
     } finally {
       setLoading(false);
+      setProgress(null);
     }
   };
 
@@ -150,6 +183,52 @@ const StoryboardSection: React.FC<Props> = ({ projectData, updateProject, onNext
           </button>
         </div>
       </div>
+
+      {/* Progress Indicator */}
+      {loading && progress && (
+        <div className="bg-gradient-to-r from-primary-900/30 to-zinc-900/50 border border-primary-700/50 rounded-xl p-5 animate-pulse-slow">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-full bg-primary-600/30 flex items-center justify-center">
+                <div className="animate-spin w-4 h-4 border-2 border-primary-400 border-t-transparent rounded-full"/>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-primary-300">
+                  {progress.phase === 'analyzing' && '🔍 Analyzing Narrative'}
+                  {progress.phase === 'chunking' && '📦 Preparing Segments'}
+                  {progress.phase === 'generating' && '🎬 Generating Scenes'}
+                  {progress.phase === 'complete' && '✅ Complete'}
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">{progress.message}</p>
+              </div>
+            </div>
+            {progress.totalChunks && progress.chunkIndex && (
+              <div className="text-right">
+                <span className="text-lg font-bold text-primary-400">
+                  {progress.chunkIndex}/{progress.totalChunks}
+                </span>
+                <p className="text-xs text-zinc-500">segments</p>
+              </div>
+            )}
+          </div>
+          
+          {/* Progress Bar */}
+          {progress.totalChunks && progress.chunkIndex && (
+            <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-primary-600 to-primary-400 h-2 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${(progress.chunkIndex / progress.totalChunks) * 100}%` }}
+              />
+            </div>
+          )}
+          
+          {progress.scenesGenerated !== undefined && progress.scenesGenerated > 0 && (
+            <p className="text-xs text-emerald-400 mt-2">
+              ✓ {progress.scenesGenerated} scene{progress.scenesGenerated > 1 ? 's' : ''} generated
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Error Alert */}
       {error && (
