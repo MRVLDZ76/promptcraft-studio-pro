@@ -36,10 +36,16 @@ export const analyzeVideoContent = async (
   
   // === PRODUCTION MODE: Use Backend API ===
   if (USE_API_ENDPOINT) {
-    console.log('🚀 Using production API endpoint:', API_BASE_URL);
+    // Supabase Edge Functions use function name directly (not /api/ prefix)
+    // URL pattern: https://xxx.supabase.co/functions/v1/api-analyze
+    const apiEndpoint = API_BASE_URL.includes('supabase.co/functions/v1')
+      ? `${API_BASE_URL}/api-analyze`  // Supabase Edge Function
+      : `${API_BASE_URL}/api/analyze`; // Vercel/Netlify fallback
+      
+    console.log('🚀 Using production API endpoint:', apiEndpoint);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
