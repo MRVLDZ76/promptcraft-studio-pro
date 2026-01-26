@@ -189,7 +189,6 @@ export const AnalysisStudio: React.FC = () => {
   const [showExportPanel, setShowExportPanel] = React.useState(false);
   const [isExporting, setIsExporting] = React.useState(false);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
-  const [showHistoryPanel, setShowHistoryPanel] = React.useState(false);
   
   // Arbiter Tuning Presets
   const [arbiterPreset, setArbiterPreset] = React.useState('custom');
