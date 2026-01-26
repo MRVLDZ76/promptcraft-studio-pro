@@ -3447,9 +3447,9 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                         <p><span className="text-neutral-600 dark:text-neutral-400 font-semibold">Error Margin:</span> <span className="text-neutral-900 dark:text-neutral-100">±{marginOfError}%</span></p>
                         <div className="bg-neutral-100 dark:bg-neutral-800/50 rounded p-3 mt-3 space-y-2">
                           <p className="font-semibold text-neutral-700 dark:text-neutral-300 mb-2">WSDC ADJUDICATION MATRIX:</p>
-                          <p className="ml-3"><span className="text-neutral-600 dark:text-neutral-400 font-medium">Content:</span> <span className="text-neutral-900 dark:text-neutral-100">{wsdcWeights.content}%</span></p>
-                          <p className="ml-3"><span className="text-neutral-600 dark:text-neutral-400 font-medium">Style:</span> <span className="text-neutral-900 dark:text-neutral-100">{wsdcWeights.style}%</span></p>
-                          <p className="ml-3"><span className="text-neutral-600 dark:text-neutral-400 font-medium">Strategy:</span> <span className="text-neutral-900 dark:text-neutral-100">{wsdcWeights.strategy}%</span></p>
+                          <p className="ml-3"><span className="text-neutral-600 dark:text-neutral-400 font-medium dark:text-neutral-400">Content:</span> <span className="text-neutral-900 dark:text-neutral-100 dark:text-neutral-400">{wsdcWeights.content}%</span></p>
+                          <p className="ml-3"><span className="text-neutral-600 dark:text-neutral-400 font-medium dark:text-neutral-400">Style:</span> <span className="text-neutral-900 dark:text-neutral-100 dark:text-neutral-400">{wsdcWeights.style}%</span></p>
+                          <p className="ml-3"><span className="text-neutral-600 dark:text-neutral-400 font-medium dark:text-neutral-400">Strategy:</span> <span className="text-neutral-900 dark:text-neutral-100 dark:text-neutral-400">{wsdcWeights.strategy}%</span></p>
                           <p className="ml-3 text-neutral-700 dark:text-neutral-300 font-medium mt-2">Total: {wsdcWeights.content + wsdcWeights.style + wsdcWeights.strategy}%</p>
                         </div>
                       </div>
