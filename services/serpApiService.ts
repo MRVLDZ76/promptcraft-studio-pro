@@ -558,6 +558,9 @@ export function formatTranscriptWithTimestamps(transcript: TranscriptSnippet[]):
  * Format view count to human-readable string
  */
 export function formatViews(views: number): string {
+  if (typeof views !== 'number' || !isFinite(views)) {
+    return '0';
+  }
   if (views >= 1000000000) {
     return `${(views / 1000000000).toFixed(1)}B`;
   }
@@ -567,7 +570,7 @@ export function formatViews(views: number): string {
   if (views >= 1000) {
     return `${(views / 1000).toFixed(1)}K`;
   }
-  return views.toString();
+  return String(views);
 }
 
 /**

@@ -141,6 +141,9 @@ export async function fetchInstagramProfile(
  * Format large numbers with K, M, B suffixes
  */
 function formatNumber(num: number): string {
+  if (typeof num !== 'number' || !isFinite(num)) {
+    return '0';
+  }
   if (num >= 1_000_000_000) {
     return `${(num / 1_000_000_000).toFixed(1)}B`;
   }
@@ -150,7 +153,7 @@ function formatNumber(num: number): string {
   if (num >= 1_000) {
     return `${(num / 1_000).toFixed(1)}K`;
   }
-  return num.toString();
+  return String(num);
 }
 
 /**
