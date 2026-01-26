@@ -183,8 +183,14 @@ OUTPUT FORMAT: ["claim 1", "claim 2", "claim 3"]
 
     const result = await chain.invoke({ text });
 
+    // Strip markdown code blocks if present (```json ... ```)
+    let cleanResult = result.trim();
+    if (cleanResult.startsWith('```')) {
+      cleanResult = cleanResult.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+    }
+
     // Parse JSON array
-    const claims = JSON.parse(result);
+    const claims = JSON.parse(cleanResult);
     return Array.isArray(claims) ? claims : [];
   } catch (error) {
     console.error("Claim extraction error:", error);

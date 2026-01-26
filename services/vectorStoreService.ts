@@ -130,7 +130,15 @@ export async function searchSimilarAnalyses(
       match_count: limit,
     });
 
-    if (error) throw error;
+    if (error) {
+      // Check for vector dimension mismatch
+      if (error.message?.includes('different vector dimensions')) {
+        console.error('❌ Vector dimension mismatch! Database expects different embedding model.');
+        console.error('💡 Solution: Ensure OPENAI_API_KEY is set, or run migration to change vector dimensions.');
+        return [];
+      }
+      throw error;
+    }
 
     return (data || []).map((result: any) => ({
       analysisId: result.analysis_id,

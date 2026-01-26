@@ -7,6 +7,7 @@ import { YouTubeVideoResult, getVideoTranscriptWithFallback, TranscriptData, ext
 import { AnalysisMode, Participant } from '../types';
 import { cacheCreatorProfile, getCachedCreatorProfile, cacheVideoTranscript, getCachedVideoTranscript } from '../services/supabaseClient';
 import { inputProcessor, InputType, ProcessedInput } from '../services/inputProcessor';
+import { saveFileAsset } from '../services/resultPersistenceService';
 import { 
   ScoringEngine, 
   AnalysisResult as ScoringResult, 
@@ -426,7 +427,31 @@ export const AnalysisStudio: React.FC = () => {
     try {
       console.log(`📁 Processing file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
       
+      // Process file to extract transcript
       const processed = await inputProcessor.processFile(file);
+      
+      // Save file to Supabase Storage and create asset record
+      try {
+        const savedAsset = await saveFileAsset(file, {
+          userId: 'anonymous', // TODO: Replace with actual user ID when auth is implemented
+          title: file.name,
+          description: `Uploaded ${processed.type} file`,
+          tags: [processed.type, processed.metadata.language || 'unknown'],
+        });
+        
+        if (savedAsset) {
+          console.log(`💾 File saved to storage: ${savedAsset.storageUrl}`);
+          // Store asset ID for later reference
+          setInputMetadata({
+            ...processed.metadata,
+            assetId: savedAsset.id,
+            storageUrl: savedAsset.storageUrl,
+          });
+        }
+      } catch (storageError) {
+        console.warn('⚠️ File saved locally but storage upload failed:', storageError);
+        // Continue with local processing even if storage fails
+      }
       
       // Update transcript with processed content
       setTranscript(processed.transcript);
@@ -1313,13 +1338,13 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
         participants: {
           A: {
             name: pA.name,
-            score: arenaStats.pointsA,
-            truthDensity: scoringResult?.participants.A.truthDensity || 0
+            score: arenaStats?.pointsA || 0,
+            truthDensity: scoringResult?.participants?.A?.truthDensity || 0
           },
           B: systemMode === 'arena' ? {
             name: pB.name,
-            score: arenaStats.pointsB,
-            truthDensity: scoringResult?.participants.B?.truthDensity || 0
+            score: arenaStats?.pointsB || 0,
+            truthDensity: scoringResult?.participants?.B?.truthDensity || 0
           } : undefined
         },
         scoringResult: scoringResult || undefined,

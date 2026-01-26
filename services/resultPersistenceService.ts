@@ -4,6 +4,7 @@
 
 import { saveAnalysisHistory, saveCachedResult, getCachedResult, generateCacheKey, saveAssetUpload, saveTranscriptionHistory } from './historyService';
 import { cacheVideoTranscript } from './supabaseClient';
+import { uploadVideo, uploadAudio, uploadTranscript, uploadDocument, generateFileHash, getBucketForMimeType } from './fileStorageService';
 import crypto from 'crypto';
 
 // ============================================
@@ -358,3 +359,93 @@ export async function generateMigrationReport() {
     note: 'Implement this when migrating existing analyses to history table',
   };
 }
+
+// ============================================
+// FILE STORAGE INTEGRATION
+// ============================================
+
+/**
+ * Upload file and save asset metadata
+ * @param file - File to upload
+ * @param metadata - Additional asset metadata
+ * @returns Asset record with storage path
+ */
+export async function saveFileAsset(
+  file: File,
+  metadata?: {
+    userId?: string;
+    title?: string;
+    description?: string;
+    tags?: string[];
+    sourceType?: 'file_upload' | 'api_import';
+  }
+) {
+  try {
+    const { userId, title, description, tags, sourceType = 'file_upload' } = metadata || {};
+    
+    // Determine asset type from MIME type
+    let assetType: 'video' | 'audio' | 'document' | 'image' | 'transcript' = 'document';
+    if (file.type.startsWith('video/')) assetType = 'video';
+    else if (file.type.startsWith('audio/')) assetType = 'audio';
+    else if (file.type.startsWith('image/')) assetType = 'image';
+    else if (file.type.includes('text') || file.name.endsWith('.txt') || file.name.endsWith('.srt') || file.name.endsWith('.vtt')) {
+      assetType = 'transcript';
+    }
+    
+    // Generate content hash for duplicate detection
+    const contentHash = await generateFileHash(file);
+    
+    // Upload file to appropriate storage bucket
+    let uploadResult;
+    switch (assetType) {
+      case 'video':
+        uploadResult = await uploadVideo(file, userId);
+        break;
+      case 'audio':
+        uploadResult = await uploadAudio(file, userId);
+        break;
+      case 'transcript':
+        uploadResult = await uploadTranscript(file, userId);
+        break;
+      case 'image':
+        console.warn('Image uploads not yet integrated with asset library');
+        return null;
+      default:
+        uploadResult = await uploadDocument(file, userId);
+    }
+    
+    if (!uploadResult.success) {
+      throw new Error(`File upload failed: ${uploadResult.error}`);
+    }
+    
+    // Save asset metadata to database
+    const assetData = {
+      user_id: userId,
+      filename: file.name,
+      asset_type: assetType,
+      source_type: sourceType,
+      file_size_bytes: file.size,
+      mime_type: file.type,
+      s3_path: uploadResult.path,
+      source_url: uploadResult.publicUrl,
+      content_hash: contentHash,
+      title: title || file.name,
+      description: description,
+      tags: tags || [],
+      status: 'ready' as const,
+    };
+    
+    const savedAsset = await saveAssetUpload(assetData);
+    
+    console.log(`✅ File asset saved: ${savedAsset.id} (${file.name})`);
+    
+    return {
+      ...savedAsset,
+      storageUrl: uploadResult.publicUrl,
+    };
+  } catch (error: any) {
+    console.error('❌ Failed to save file asset:', error);
+    throw error;
+  }
+}
+

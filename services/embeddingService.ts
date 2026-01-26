@@ -9,9 +9,16 @@ let EMBEDDING_PROVIDER = process.env.EMBEDDING_PROVIDER || "openai"; // "openai"
 // Auto-select provider: if OpenAI key missing, use Google when Gemini key exists
 const HAS_OPENAI = !!process.env.OPENAI_API_KEY;
 const HAS_GEMINI = !!(process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY);
+
+// IMPORTANT: Database uses 1536-dimension vectors (OpenAI)
+// If switching to Google (768 dims), you MUST migrate the database vectors
 if (!HAS_OPENAI && HAS_GEMINI) {
-  EMBEDDING_PROVIDER = "google";
+  console.warn('⚠️ OpenAI key missing. Using Google embeddings (768-dim) but database expects OpenAI (1536-dim). Vector search will fail!');
+  console.warn('⚠️ Either: 1) Add OPENAI_API_KEY, or 2) Run migration to change vector dimensions to 768');
+  // Force OpenAI requirement for now to prevent dimension mismatch
+  // EMBEDDING_PROVIDER = "google";
 }
+
 const CHUNK_SIZE = 1000; // Characters per chunk
 const CHUNK_OVERLAP = 200; // Overlap between chunks
 
