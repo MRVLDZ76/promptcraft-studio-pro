@@ -1,14 +1,43 @@
 /**
  * Supabase Edge Function: api-transcribe
  * 
- * Transcription endpoint for audio/video files using Gemini Multimodal
+ * Transcription endpoint for audio/video files using multiple services:
+ * 
+ * YOUTUBE TRANSCRIPTION HIERARCHY:
+ * 1. TranscriptAPI (Primary) - Fast, reliable, specialized YouTube transcript service
+ *    - Endpoint: https://transcriptapi.com/api/v2/youtube/transcript
+ *    - Provides accurate timestamped segments from YouTube's native transcripts
+ *    - Fallback only on errors: 404 (no transcript), 429 (rate limit), 500 (server error)
+ * 
+ * 2. Gemini Multimodal (Fallback) - AI-powered video analysis
+ *    - Used when TranscriptAPI fails or transcript unavailable
+ *    - Can transcribe video content directly
+ * 
+ * AUDIO/VIDEO FILE TRANSCRIPTION:
+ * - Gemini Multimodal - Processes uploaded audio/video files
+ * 
  * Converted from Vercel serverless to Deno/Supabase Edge Function format
  * 
  * Endpoint: POST /functions/v1/api-transcribe
+ * 
+ * Request Body:
+ * {
+ *   youtubeUrl?: string,  // YouTube URL or video ID
+ *   audio?: string,       // Base64 encoded audio
+ *   video?: string,       // Base64 encoded video
+ *   mimeType?: string,    // Required for audio/video files
+ *   options?: {
+ *     includeTimestamps?: boolean,
+ *     enableDiarization?: boolean,
+ *     language?: string,
+ *     maxSpeakers?: number
+ *   }
+ * }
  */
 
 // @ts-ignore - Deno types are available in Supabase Edge Functions runtime
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || '';
+const TRANSCRIPT_API_KEY = 'sk_jTWTUT6575TVwybz0JgeH5MV4QwNo5flcilvL-52nhw';
 
 // CORS headers for all origins
 const corsHeaders = {
@@ -201,6 +230,117 @@ async function callGeminiForTranscription(
 }
 
 /**
+ * Extract YouTube video ID from URL or return as-is if already an ID
+ */
+function extractYoutubeVideoId(urlOrId: string): string {
+  // If it's already just an ID (11 characters, alphanumeric with - and _)
+  if (/^[a-zA-Z0-9_-]{11}$/.test(urlOrId)) {
+    return urlOrId;
+  }
+  
+  // Handle various YouTube URL formats
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/v\/([a-zA-Z0-9_-]{11})/
+  ];
+  
+  for (const pattern of patterns) {
+    const match = urlOrId.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+  
+  // Return original if no pattern matched (might be a valid ID)
+  return urlOrId;
+}
+
+/**
+ * Call TranscriptAPI.com for YouTube transcription (Primary fallback service)
+ * This is a specialized, reliable service for YouTube transcripts
+ */
+async function callTranscriptAPI(videoUrlOrId: string): Promise<any> {
+  const url = 'https://transcriptapi.com/api/v2/youtube/transcript';
+  const params = new URLSearchParams({
+    video_url: videoUrlOrId,
+    format: 'json'
+  });
+
+  console.log(`🔄 Calling TranscriptAPI for video: ${extractYoutubeVideoId(videoUrlOrId)}`);
+
+  const response = await fetch(`${url}?${params}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${TRANSCRIPT_API_KEY}`
+    },
+    signal: AbortSignal.timeout(30000) // 30 second timeout
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    let errorDetail = errorBody;
+    
+    try {
+      const errorJson = JSON.parse(errorBody);
+      errorDetail = errorJson.detail || errorBody;
+    } catch {
+      // Keep errorBody as is
+    }
+
+    // Return structured error info
+    throw {
+      status: response.status,
+      detail: errorDetail,
+      isTranscriptAPIError: true
+    };
+  }
+
+  const data = await response.json();
+  console.log(`✅ TranscriptAPI success: ${data.transcript?.length || 0} segments`);
+  
+  // Convert TranscriptAPI format to our standard format
+  return convertTranscriptAPIResponse(data);
+}
+
+/**
+ * Convert TranscriptAPI response to our standard format
+ */
+function convertTranscriptAPIResponse(apiResponse: any): any {
+  const segments = apiResponse.transcript || [];
+  
+  // Build full transcript text
+  const transcriptText = segments.map((seg: any) => seg.text).join(' ');
+  
+  // Convert segments to our format (add 'end' timestamp)
+  const convertedSegments = segments.map((seg: any, idx: number) => ({
+    text: seg.text,
+    start: seg.start,
+    end: seg.start + seg.duration,
+    speaker: 'A' // TranscriptAPI doesn't provide speaker diarization
+  }));
+
+  const totalDuration = segments.length > 0 
+    ? segments[segments.length - 1].start + segments[segments.length - 1].duration 
+    : 0;
+
+  return {
+    transcript: transcriptText,
+    segments: convertedSegments,
+    duration: totalDuration,
+    language: apiResponse.language || 'unknown',
+    confidence: 0.95, // TranscriptAPI is highly reliable
+    speakers: ['A'],
+    wordCount: transcriptText.split(/\s+/).filter(Boolean).length,
+    metadata: {
+      title: apiResponse.metadata?.title || '',
+      source: 'TranscriptAPI',
+      videoId: apiResponse.video_id || ''
+    }
+  };
+}
+
+/**
  * Call Gemini API for YouTube URL transcription
  * Uses Gemini's ability to analyze YouTube videos directly
  */
@@ -296,20 +436,62 @@ Deno.serve(async (req: Request) => {
     if (youtubeUrl) {
       console.log(`🎬 Transcribing YouTube video: ${youtubeUrl}`);
       
+      // Try TranscriptAPI first (faster, more reliable, specialized for YouTube)
+      try {
+        const transcriptionResult = await callTranscriptAPI(youtubeUrl);
+        
+        return jsonResponse({
+          success: true,
+          source: 'TranscriptAPI',
+          ...transcriptionResult
+        });
+      } catch (error: any) {
+        // Log TranscriptAPI failure
+        if (error.isTranscriptAPIError) {
+          console.warn(`⚠️ TranscriptAPI failed (${error.status}): ${error.detail}`);
+          
+          // Don't fallback to Gemini for certain errors
+          if (error.status === 401) {
+            return errorResponse('TranscriptAPI: Invalid or missing API key', 500);
+          }
+          if (error.status === 402) {
+            return errorResponse('TranscriptAPI: Payment required or credits exhausted', 500);
+          }
+          if (error.status === 422) {
+            return errorResponse('Invalid YouTube video URL', 400, error.detail);
+          }
+          
+          // For 404 (transcript unavailable) or other errors, fallback to Gemini
+          console.log('🔄 Falling back to Gemini for YouTube transcription...');
+        } else {
+          console.warn(`⚠️ TranscriptAPI error: ${error.message || error}`);
+        }
+      }
+      
+      // Fallback to Gemini if TranscriptAPI fails or is unavailable
       if (!GEMINI_API_KEY) {
-        return errorResponse('GEMINI_API_KEY not configured', 500);
+        return errorResponse('Both TranscriptAPI and Gemini failed. No transcription service available.', 500);
       }
 
-      const responseText = await callGeminiForYouTubeTranscription(youtubeUrl, options);
-      console.log('📝 YouTube transcription response received');
-      
-      const transcriptionResult = parseTranscriptionResponse(responseText);
-      
-      return jsonResponse({
-        success: true,
-        source: 'youtube',
-        ...transcriptionResult
-      });
+      try {
+        const responseText = await callGeminiForYouTubeTranscription(youtubeUrl, options);
+        console.log('📝 YouTube transcription response received from Gemini');
+        
+        const transcriptionResult = parseTranscriptionResponse(responseText);
+        
+        return jsonResponse({
+          success: true,
+          source: 'Gemini (fallback)',
+          ...transcriptionResult
+        });
+      } catch (geminiError: any) {
+        console.error('❌ Gemini fallback also failed:', geminiError);
+        return errorResponse(
+          'YouTube transcription failed on both services',
+          500,
+          geminiError.message || String(geminiError)
+        );
+      }
     }
 
     // Handle audio/video file transcription
