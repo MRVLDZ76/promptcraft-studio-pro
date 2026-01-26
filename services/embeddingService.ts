@@ -5,16 +5,18 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 
 // Configuration
-let EMBEDDING_PROVIDER = process.env.EMBEDDING_PROVIDER || "openai"; // "openai" or "google"
+let EMBEDDING_PROVIDER = process.env.EMBEDDING_PROVIDER || import.meta.env?.VITE_EMBEDDING_PROVIDER || "openai"; // "openai" or "google"
 // Auto-select provider: if OpenAI key missing, use Google when Gemini key exists
-const HAS_OPENAI = !!process.env.OPENAI_API_KEY;
-const HAS_GEMINI = !!(process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY);
+const OPENAI_KEY = process.env.OPENAI_API_KEY || import.meta.env?.VITE_OPENAI_API_KEY;
+const GEMINI_KEY = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || import.meta.env?.VITE_GEMINI_API_KEY;
+const HAS_OPENAI = !!OPENAI_KEY;
+const HAS_GEMINI = !!GEMINI_KEY;
 
 // IMPORTANT: Database uses 1536-dimension vectors (OpenAI)
 // If switching to Google (768 dims), you MUST migrate the database vectors
 if (!HAS_OPENAI && HAS_GEMINI) {
   console.warn('⚠️ OpenAI key missing. Using Google embeddings (768-dim) but database expects OpenAI (1536-dim). Vector search will fail!');
-  console.warn('⚠️ Either: 1) Add OPENAI_API_KEY, or 2) Run migration to change vector dimensions to 768');
+  console.warn('⚠️ Either: 1) Add OPENAI_API_KEY/VITE_OPENAI_API_KEY, or 2) Run migration to change vector dimensions to 768');
   // Force OpenAI requirement for now to prevent dimension mismatch
   // EMBEDDING_PROVIDER = "google";
 }
@@ -28,15 +30,15 @@ const CHUNK_OVERLAP = 200; // Overlap between chunks
 export function initEmbeddingModel() {
   if (EMBEDDING_PROVIDER === "google") {
     return new GoogleGenerativeAIEmbeddings({
-      apiKey: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY,
+      apiKey: GEMINI_KEY,
       modelName: "text-embedding-004", // 768 dimensions
     });
   } else {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error("Missing credentials. Provide OPENAI_API_KEY or set EMBEDDING_PROVIDER=google with GEMINI_API_KEY.");
+    if (!OPENAI_KEY) {
+      throw new Error("Missing credentials. Provide OPENAI_API_KEY/VITE_OPENAI_API_KEY or set EMBEDDING_PROVIDER=google with GEMINI_API_KEY.");
     }
     return new OpenAIEmbeddings({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: OPENAI_KEY,
       modelName: "text-embedding-3-small", // 1536 dimensions, $0.00002/1K tokens
     });
   }

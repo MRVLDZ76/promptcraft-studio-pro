@@ -138,7 +138,13 @@ export async function analyzeWithRAG(params: AnalysisParams): Promise<any> {
     });
 
     // Parse JSON response
-    const parsed = JSON.parse(result);
+    // Strip markdown code blocks if present (```json ... ```)
+    let cleanResult = (result || '').trim();
+    if (cleanResult.startsWith('```')) {
+      cleanResult = cleanResult.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+    }
+
+    const parsed = JSON.parse(cleanResult);
 
     return {
       ...parsed,
@@ -296,7 +302,13 @@ Return JSON:
       sources: sourcesText,
     });
 
-    const parsed = JSON.parse(result);
+    // Strip markdown code blocks if present (```json ... ```)
+    let cleanResult = (result || '').trim();
+    if (cleanResult.startsWith('```')) {
+      cleanResult = cleanResult.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+    }
+
+    const parsed = JSON.parse(cleanResult);
 
     return {
       claim,
