@@ -137,16 +137,16 @@ export const AnalysisStudio: React.FC = () => {
     name: 'Proponent Alpha',
     vector: 'Efficiency',
     socialUrl: '@alpha_logic',
-    followers: '1.2M',
-    level: 8,
+    followers: '0',
+    level: 1,
     thumbnail: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop'
   });
   const [pB, setPB] = React.useState<Participant>({
     name: 'Skeptic Beta',
     vector: 'Ethics',
     socialUrl: '@beta_critique',
-    followers: '850K',
-    level: 7,
+    followers: '0',
+    level: 1,
     thumbnail: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop'
   });
 
@@ -171,6 +171,7 @@ export const AnalysisStudio: React.FC = () => {
   const [scoringResult, setScoringResult] = React.useState<ScoringResult | null>(null);
   const [showAuditLog, setShowAuditLog] = React.useState(false);
   const [showHistoryPanel, setShowHistoryPanel] = React.useState(false);
+  const [showDebaterBoard, setShowDebaterBoard] = React.useState(true);
   
   // Phase 3: Fact Verification State
   const [factVerificationReport, setFactVerificationReport] = React.useState<FactVerificationReport | null>(null);
@@ -248,6 +249,32 @@ export const AnalysisStudio: React.FC = () => {
   const debaterTruth = (side: 'A' | 'B') => {
     const value = scoringResult?.participants?.[side]?.truthDensity ?? scoringResult?.truthDensity ?? 0;
     return typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : value;
+  };
+
+  // Calculate debater level based on profile metrics
+  const calculateDebaterLevel = (followers: string | undefined, totalVideos?: number, engagement?: string | number): number => {
+    let level = 1;
+    
+    // Parse followers count
+    const followerCount = followers ? parseInt(followers.replace(/[^0-9.]/g, '').replace('.', '')) || 0 : 0;
+    
+    // Level progression: every 100K followers adds ~1 level, max 10
+    level += Math.min(Math.floor(followerCount / 100000), 6);
+    
+    // Bonus levels based on content creation (videos)
+    if (totalVideos) {
+      level += Math.min(Math.floor(totalVideos / 500), 2);
+    }
+    
+    // Engagement multiplier
+    if (engagement) {
+      const engagementNum = typeof engagement === 'string' 
+        ? parseFloat(engagement.replace('%', '')) 
+        : engagement;
+      if (engagementNum > 5) level += 1;
+    }
+    
+    return Math.min(Math.max(level, 1), 10); // Clamp between 1-10
   };
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -785,6 +812,8 @@ export const AnalysisStudio: React.FC = () => {
 
       if (profile) {
         setProfileData(profile);
+        // Calculate level based on profile metrics
+        const calculatedLevel = calculateDebaterLevel(profile.followers, profile.totalVideos, profile.engagement);
         // Update participant data with fetched info
         setParticipant({
           ...participant,
@@ -792,6 +821,7 @@ export const AnalysisStudio: React.FC = () => {
           followers: profile.followers,
           thumbnail: profile.thumbnail,
           socialUrl: profile.username,
+          level: calculatedLevel,
         });
         
         // For YouTube, open video selector
@@ -1588,60 +1618,83 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
         </div>
       </header>
 
-      {/* Debater Status Board */}
-      <div className="max-w-[1600px] mx-auto px-6 mt-4">
-        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-sm font-bold text-neutral-800 dark:text-neutral-100">Debater Status Board</p>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Win/Loss status with current scores and truth density</p>
-            </div>
-            <button
-              onClick={() => setShowHistoryPanel(true)}
-              className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-            >
-              <History className="w-3 h-3" /> History & Reuse
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-xs">
-              <thead className="text-[11px] uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                <tr>
-                  <th className="px-3 py-2">Debater</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2">Score</th>
-                  <th className="px-3 py-2">Truth Density</th>
-                  <th className="px-3 py-2">Followers</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800 text-neutral-700 dark:text-neutral-200">
-                <tr className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                  <td className="px-3 py-2 font-semibold">{pA.name}</td>
-                  <td className="px-3 py-2"><span className="px-2 py-1 text-[10px] rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">{debaterStatus('A')}</span></td>
-                  <td className="px-3 py-2 font-bold">{arenaStats.pointsA} pts</td>
-                  <td className="px-3 py-2">{debaterTruth('A')}</td>
-                  <td className="px-3 py-2">{arenaStats.followersA}</td>
-                </tr>
-                {analysisMode === AnalysisMode.ARENA && (
-                  <tr className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                    <td className="px-3 py-2 font-semibold">{pB.name}</td>
-                    <td className="px-3 py-2"><span className="px-2 py-1 text-[10px] rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">{debaterStatus('B')}</span></td>
-                    <td className="px-3 py-2 font-bold">{arenaStats.pointsB} pts</td>
-                    <td className="px-3 py-2">{debaterTruth('B')}</td>
-                    <td className="px-3 py-2">{arenaStats.followersB}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
       {/* 2. Calibration Workspace */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         
         {/* Sidebar: Deep Logic Calibration */}
         <aside className="w-full lg:w-72 shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-y-auto p-4 space-y-5">
+          
+          {/* Debater Status Board - Collapsible */}
+          {systemMode === 'arena' && analysisMode === AnalysisMode.ARENA && (
+            <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+              <button
+                onClick={() => setShowDebaterBoard(!showDebaterBoard)}
+                className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-neutral-500" />
+                  <div className="text-left">
+                    <p className="text-[10px] font-bold text-neutral-700 dark:text-neutral-200 uppercase">Status Board</p>
+                    <p className="text-[8px] text-neutral-500 dark:text-neutral-400">Win/Loss & Scores</p>
+                  </div>
+                </div>
+                {showDebaterBoard ? (
+                  <ChevronUp className="w-3 h-3 text-neutral-500" />
+                ) : (
+                  <ChevronDown className="w-3 h-3 text-neutral-500" />
+                )}
+              </button>
+              
+              {showDebaterBoard && (
+                <div className="border-t border-neutral-200 dark:border-neutral-700 p-3 space-y-2">
+                  <div className="space-y-2 text-[9px]">
+                    {/* Participant A */}
+                    <div className="bg-white dark:bg-black/30 rounded p-2 border border-neutral-100 dark:border-neutral-600/30">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-semibold text-neutral-700 dark:text-neutral-200 truncate">{pA.name}</span>
+                        <span className="px-2 py-0.5 text-[8px] rounded-full bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 font-bold">{debaterStatus('A')}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[8px]">
+                        <div>
+                          <span className="text-neutral-500 dark:text-neutral-400">Score</span>
+                          <p className="font-bold text-neutral-700 dark:text-neutral-200">{arenaStats.pointsA} pts</p>
+                        </div>
+                        <div>
+                          <span className="text-neutral-500 dark:text-neutral-400">Truth</span>
+                          <p className="font-bold text-neutral-700 dark:text-neutral-200">{debaterTruth('A')}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Participant B */}
+                    <div className="bg-white dark:bg-black/30 rounded p-2 border border-neutral-100 dark:border-neutral-600/30">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-semibold text-neutral-700 dark:text-neutral-200 truncate">{pB.name}</span>
+                        <span className="px-2 py-0.5 text-[8px] rounded-full bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 font-bold">{debaterStatus('B')}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[8px]">
+                        <div>
+                          <span className="text-neutral-500 dark:text-neutral-400">Score</span>
+                          <p className="font-bold text-neutral-700 dark:text-neutral-200">{arenaStats.pointsB} pts</p>
+                        </div>
+                        <div>
+                          <span className="text-neutral-500 dark:text-neutral-400">Truth</span>
+                          <p className="font-bold text-neutral-700 dark:text-neutral-200">{debaterTruth('B')}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => setShowHistoryPanel(true)}
+                    className="w-full mt-2 px-2 py-2 text-[9px] font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors flex items-center justify-center gap-1.5 border border-blue-200 dark:border-blue-800/50"
+                  >
+                    <History className="w-3 h-3" /> History & Reuse
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           
           {/* Creator Profile Editor - Expandable with API Integration */}
           <div className="space-y-3">
@@ -1706,8 +1759,11 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                      <input value={pA.followers} onChange={e => setPA({...pA, followers: e.target.value})} className="w-full text-[10px] font-bold bg-transparent outline-none text-neutral-600 dark:text-neutral-300" />
                    </div>
                    <div className="w-16 bg-white dark:bg-black/40 rounded p-1.5 border border-neutral-100 dark:border-neutral-500/10">
-                     <label className="text-[8px] block font-black text-neutral-400 dark:text-neutral-600 uppercase">Level</label>
-                     <input type="number" value={pA.level} onChange={e => setPA({...pA, level: parseInt(e.target.value)})} className="w-full text-[10px] font-bold bg-transparent outline-none text-neutral-600 dark:text-neutral-300 text-center" />
+                     <label className="text-[8px] block font-black text-neutral-400 dark:text-neutral-600 uppercase flex items-center gap-1">
+                       <span>Level</span>
+                       <span className="text-[7px] text-neutral-400">auto</span>
+                     </label>
+                     <div className="w-full text-[10px] font-bold text-neutral-600 dark:text-neutral-300 text-center">{pA.level}</div>
                    </div>
                  </div>
                </div>
@@ -1820,8 +1876,11 @@ APPLY these calibrations dynamically throughout your analysis. ${systemMode === 
                        <input value={pB.followers} onChange={e => setPB({...pB, followers: e.target.value})} className="w-full text-[10px] font-bold bg-transparent outline-none text-neutral-700 dark:text-neutral-400" />
                      </div>
                      <div className="w-16 bg-white dark:bg-black/40 rounded p-1.5 border border-neutral-100 dark:border-neutral-500/10">
-                       <label className="text-[8px] block font-black text-neutral-400 dark:text-neutral-600 uppercase">Level</label>
-                       <input type="number" value={pB.level} onChange={e => setPB({...pB, level: parseInt(e.target.value)})} className="w-full text-[10px] font-bold bg-transparent outline-none text-neutral-700 dark:text-neutral-400 text-center" />
+                       <label className="text-[8px] block font-black text-neutral-400 dark:text-neutral-600 uppercase flex items-center gap-1">
+                         <span>Level</span>
+                         <span className="text-[7px] text-neutral-400">auto</span>
+                       </label>
+                       <div className="w-full text-[10px] font-bold text-neutral-700 dark:text-neutral-400 text-center">{pB.level}</div>
                      </div>
                    </div>
                  </div>
