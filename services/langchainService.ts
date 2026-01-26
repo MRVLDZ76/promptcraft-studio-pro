@@ -11,7 +11,8 @@ import { chunkDocument } from "./chunkingService";
 
 // Configuration
 const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-const MODEL_NAME = "gemini-1.5-pro";
+// Use a model compatible with v1beta generateContent to avoid 404
+const MODEL_NAME = "gemini-2.0-flash";
 const TEMPERATURE = 0.7;
 const MAX_OUTPUT_TOKENS = 8192;
 

@@ -370,15 +370,24 @@ async function callGeminiAPI(
     throw new Error('No response text from Gemini API');
   }
 
-  // Parse JSON response
+  // Parse JSON response with robust fallbacks
   try {
     return JSON.parse(responseText);
   } catch (parseError) {
     // Try to extract JSON if wrapped in markdown
-    const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) ||
-                      responseText.match(/```\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[1]);
+    const fenced = responseText.match(/```json\s*([\s\S]*?)\s*```/) ||
+                   responseText.match(/```\s*([\s\S]*?)\s*```/);
+    if (fenced) {
+      try {
+        return JSON.parse(fenced[1]);
+      } catch {}
+    }
+    // Try to extract first JSON object via braces
+    const objMatch = responseText.match(/\{[\s\S]*\}/);
+    if (objMatch) {
+      try {
+        return JSON.parse(objMatch[0]);
+      } catch {}
     }
     throw new Error('Failed to parse JSON response from LLM');
   }
@@ -498,7 +507,7 @@ Deno.serve(async (req: Request) => {
         calibration,
         mode,
         timestamp: new Date().toISOString(),
-        model: 'gemini-1.5-pro',
+        model: 'gemini-2.0-flash',
       },
     });
   } catch (error) {
