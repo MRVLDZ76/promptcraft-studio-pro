@@ -14,6 +14,7 @@ const DEFAULT_PROJECT: ProjectData = {
   segment: '',
   content: '',
   contextNote: '',
+  negativePrompt: 'text, watermarks, logos, titles, subtitles, captions, words, letters, UI elements, low quality, blurry, distorted faces',
   summary: '',
   setting: {
     year: '',
@@ -113,7 +114,7 @@ const App: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-8 py-12 max-w-7xl">
+      <main className={`container mx-auto px-8 py-12 max-w-7xl ${currentStep > Step.TEMPLATE && currentStep < Step.PRODUCTION ? 'pb-32' : ''}`}>
         {currentStep === Step.TEMPLATE && (
           <TemplateSelection updateProject={updateProject} onNext={nextStep} />
         )}
@@ -127,7 +128,7 @@ const App: React.FC = () => {
           <StoryboardSection projectData={projectData} updateProject={updateProject} onNext={nextStep} />
         )}
         {currentStep === Step.PRODUCTION && (
-          <VideoProduction projectData={projectData} updateProject={updateProject} onReset={resetProject} />
+          <VideoProduction projectData={projectData} updateProject={updateProject} onReset={resetProject} onGoBack={prevStep} />
         )}
       </main>
 

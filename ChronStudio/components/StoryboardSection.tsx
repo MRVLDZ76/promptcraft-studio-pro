@@ -119,7 +119,8 @@ const StoryboardSection: React.FC<Props> = ({ projectData, updateProject, onNext
         projectData.style,
         projectData.setting,
         projectData.category,
-        onProgress
+        onProgress,
+        projectData.negativePrompt
       );
       
       if (scenes.length === 0) {
@@ -242,7 +243,8 @@ const StoryboardSection: React.FC<Props> = ({ projectData, updateProject, onNext
         projectData.characters,
         projectData.style,
         projectData.setting,
-        projectData.contextNote
+        projectData.contextNote,
+        projectData.negativePrompt
       );
       
       const updatedStoryboard = projectData.storyboard.map(s =>

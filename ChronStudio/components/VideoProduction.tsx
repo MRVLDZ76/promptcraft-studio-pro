@@ -13,7 +13,10 @@ import {
   ArchiveBoxArrowDownIcon,
   CheckCircleIcon,
   ArrowRightStartOnRectangleIcon,
-  CpuChipIcon
+  CpuChipIcon,
+  ExclamationTriangleIcon,
+  ArrowLeftIcon,
+  LightBulbIcon
 } from '@heroicons/react/24/solid';
 import JSZip from 'https://esm.sh/jszip@3.10.1';
 import saveAs from 'https://esm.sh/file-saver@2.0.5';
@@ -22,19 +25,19 @@ interface Props {
   projectData: ProjectData;
   updateProject: (data: Partial<ProjectData>) => void;
   onReset: () => void;
+  onGoBack?: () => void;
 }
 
 type ExportType = 'INDIVIDUAL' | 'SEQUENCE' | 'SINGLE_FILE';
 type Quality = 'LOW' | 'MEDIUM' | 'HIGH';
 
-const VideoProduction: React.FC<Props> = ({ projectData, updateProject, onReset }) => {
+const VideoProduction: React.FC<Props> = ({ projectData, updateProject, onReset, onGoBack }) => {
   const [generatingSceneId, setGeneratingSceneId] = useState<string | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<string>('');
   const [exportQuality, setExportQuality] = useState<Quality>('HIGH');
-  const [exportType, setExportType] = useState<ExportType>('SEQUENCE');
-
+  const [exportType, setExportType] = useState<ExportType>('SEQUENCE');  const [errorModal, setErrorModal] = useState<{ show: boolean; message: string; isSafetyError: boolean }>({ show: false, message: '', isSafetyError: false });
   const isExternal = projectData.mode === ProductionMode.EXTERNAL;
 
   const handleGenerateScene = async (scene: Scene) => {
@@ -55,9 +58,19 @@ const VideoProduction: React.FC<Props> = ({ projectData, updateProject, onReset 
         s.id === scene.id ? { ...s, status: 'completed', videoUrl: videoUrl } as Scene : s
       );
       updateProject({ storyboard: updatedStoryboard });
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error('Video generation error:', e);
       updateSceneStatus(scene.id, 'failed');
+      
+      // Check if it's a safety filter error
+      const isSafetyError = e.message?.includes('VEO_SAFETY_FILTER');
+      const errorMessage = e.message || 'Video generation failed. Please try again.';
+      
+      setErrorModal({
+        show: true,
+        message: errorMessage,
+        isSafetyError: isSafetyError
+      });
     } finally {
       setGeneratingSceneId(null);
     }
@@ -607,6 +620,125 @@ const VideoProduction: React.FC<Props> = ({ projectData, updateProject, onReset 
                      <><ArrowDownTrayIcon className="w-4 h-4" /> <span>Download Package</span></>
                   )}
                </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ERROR MODAL - Safety Filter & General Errors */}
+      {errorModal.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden">
+            <div className={`flex items-center justify-between p-6 border-b ${errorModal.isSafetyError ? 'border-amber-900/50 bg-amber-950/30' : 'border-red-900/50 bg-red-950/30'}`}>
+              <div className="flex items-center space-x-3">
+                <div className={`p-2 rounded-lg border ${errorModal.isSafetyError ? 'bg-amber-600/10 border-amber-600/20' : 'bg-red-600/10 border-red-600/20'}`}>
+                  {errorModal.isSafetyError ? (
+                    <ExclamationTriangleIcon className="w-6 h-6 text-amber-500" />
+                  ) : (
+                    <ExclamationCircleIcon className="w-6 h-6 text-red-500" />
+                  )}
+                </div>
+                <h3 className="text-xl font-bold text-white">
+                  {errorModal.isSafetyError ? 'Content Policy Restriction' : 'Generation Error'}
+                </h3>
+              </div>
+              <button onClick={() => setErrorModal({ show: false, message: '', isSafetyError: false })} className="text-zinc-500 hover:text-white transition-colors">
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* Error Message */}
+              <div className={`rounded-lg p-4 border ${errorModal.isSafetyError ? 'bg-amber-950/20 border-amber-900/30' : 'bg-red-950/20 border-red-900/30'}`}>
+                <pre className="text-sm text-zinc-300 whitespace-pre-wrap font-mono leading-relaxed">
+                  {errorModal.message}
+                </pre>
+              </div>
+
+              {/* Solutions Section for Safety Errors */}
+              {errorModal.isSafetyError && (
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <LightBulbIcon className="w-5 h-5 text-yellow-400" />
+                    <h4 className="text-sm font-bold text-yellow-400 uppercase tracking-wide">Recommended Solutions</h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {/* Solution 1 */}
+                    <div className="bg-zinc-950/50 rounded-lg p-4 border border-zinc-800">
+                      <h5 className="text-sm font-bold text-emerald-400 mb-2">✓ Use Generic Descriptions</h5>
+                      <p className="text-xs text-zinc-400 mb-2">Remove specific people's names and use generic character descriptions:</p>
+                      <ul className="text-xs text-zinc-500 space-y-1 ml-4">
+                        <li>• Instead of "David": use "a young shepherd in his 20s"</li>
+                        <li>• Instead of "Moses": use "an elderly prophet with a staff"</li>
+                        <li>• Instead of "Napoleon": use "a military leader in French uniform"</li>
+                      </ul>
+                    </div>
+
+                    {/* Solution 2 */}
+                    <div className="bg-zinc-950/50 rounded-lg p-4 border border-zinc-800">
+                      <h5 className="text-sm font-bold text-blue-400 mb-2">🎨 Switch to Animated/Stylized Style</h5>
+                      <p className="text-xs text-zinc-400 mb-2">Non-photorealistic styles often work better for historical figures:</p>
+                      <ul className="text-xs text-zinc-500 space-y-1 ml-4">
+                        <li>• Animated Stylized (Pixar-style)</li>
+                        <li>• Low Poly 3D</li>
+                        <li>• Pencil Sketch</li>
+                        <li>• Surreal Dreamscape</li>
+                      </ul>
+                    </div>
+
+                    {/* Solution 3 */}
+                    <div className="bg-zinc-950/50 rounded-lg p-4 border border-zinc-800">
+                      <h5 className="text-sm font-bold text-purple-400 mb-2">📤 Upload Custom Assets</h5>
+                      <p className="text-xs text-zinc-400 mb-2">Create or source non-copyrighted reference images:</p>
+                      <ul className="text-xs text-zinc-500 space-y-1 ml-4">
+                        <li>• Commission custom artwork</li>
+                        <li>• Use public domain historical images</li>
+                        <li>• Create fictional character designs</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="p-6 border-t border-zinc-800 bg-zinc-950/30 flex justify-between">
+              <button 
+                onClick={() => setErrorModal({ show: false, message: '', isSafetyError: false })}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-white transition-colors"
+              >
+                Dismiss
+              </button>
+              <div className="flex space-x-3">
+                {onGoBack && errorModal.isSafetyError && (
+                  <>
+                    <button 
+                      onClick={() => {
+                        setErrorModal({ show: false, message: '', isSafetyError: false });
+                        // Go back 2 steps to Casting (Step 2)
+                        onGoBack();
+                        onGoBack();
+                      }}
+                      className="flex items-center space-x-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-4 py-2 rounded-lg font-medium transition-colors text-sm border border-zinc-700"
+                    >
+                      <ArrowLeftIcon className="w-4 h-4" />
+                      <span>Back to Casting</span>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setErrorModal({ show: false, message: '', isSafetyError: false });
+                        // Go back 1 step to Storyboard (Step 3)
+                        onGoBack();
+                      }}
+                      className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm shadow-lg shadow-primary-900/20"
+                    >
+                      <ArrowLeftIcon className="w-4 h-4" />
+                      <span>Back to Storyboard</span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

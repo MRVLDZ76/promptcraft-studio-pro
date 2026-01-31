@@ -51,6 +51,7 @@ export interface ProjectData {
   segment: string;
   content: string;
   contextNote: string; 
+  negativePrompt: string; // Things to avoid in generation (text, watermarks, etc.)
   
   summary: string;
   setting: {

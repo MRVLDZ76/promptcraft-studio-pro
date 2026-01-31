@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ProjectData, Character, ProjectCategory } from '../types';
 import { analyzeSourceText, researchHistoricalContent, previewNarrativeStructure } from '../services/geminiService';
 import { getTranslations, getBooks, getChapter, BibleBook, Translation } from '../services/bibleApiService';
-import { ArrowRightIcon, SparklesIcon, CloudArrowDownIcon, BookOpenIcon, GlobeAmericasIcon, MagnifyingGlassIcon, DocumentTextIcon, ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { ArrowRightIcon, SparklesIcon, CloudArrowDownIcon, BookOpenIcon, GlobeAmericasIcon, MagnifyingGlassIcon, DocumentTextIcon, ExclamationTriangleIcon, CheckCircleIcon, VideoCameraIcon, SwatchIcon, SpeakerWaveIcon, SunIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface Props {
   projectData: ProjectData;
@@ -397,16 +397,206 @@ const InputSection: React.FC<Props> = ({ projectData, updateProject, onNext }) =
             </div>
           )}
 
-           <div className="space-y-2">
+           <div className="space-y-4">
             <div className="flex justify-between">
               <label className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Additional Context / Style Notes</label>
-              <span className="text-[10px] text-zinc-600">RECOMMENDED</span>
+              <span className="text-[10px] text-zinc-600">CLICK TO ADD</span>
             </div>
+            
+            {/* STYLE PRESET TAGS */}
+            <div className="space-y-4">
+              {/* Tone Styles */}
+              <div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <SpeakerWaveIcon className="w-3 h-3 text-purple-400" />
+                  <span className="text-[10px] text-purple-400 uppercase font-bold tracking-wider">Tone</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {['Epic & Dramatic', 'Intimate & Personal', 'Mysterious & Tense', 'Hopeful & Uplifting', 'Dark & Gritty', 'Whimsical & Playful', 'Documentary & Factual', 'Nostalgic & Reflective'].map((tone) => (
+                    <button
+                      key={tone}
+                      onClick={() => {
+                        const newNote = projectData.contextNote.includes(tone) 
+                          ? projectData.contextNote.replace(tone + ', ', '').replace(tone, '')
+                          : (projectData.contextNote ? projectData.contextNote + ', ' : '') + tone;
+                        updateProject({ contextNote: newNote.replace(/^,\s*/, '').replace(/,\s*$/, '') });
+                      }}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all border ${
+                        projectData.contextNote.includes(tone)
+                          ? 'bg-purple-600/30 border-purple-500 text-purple-300'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:border-zinc-700'
+                      }`}
+                    >
+                      {tone}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Camera Styles */}
+              <div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <VideoCameraIcon className="w-3 h-3 text-blue-400" />
+                  <span className="text-[10px] text-blue-400 uppercase font-bold tracking-wider">Camera Style</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {['Cinematic Wide Shots', 'Intimate Close-ups', 'Handheld Documentary', 'Smooth Dolly Movement', 'Aerial/Drone Views', 'Static Tableaux', 'Tracking Shots', 'POV Perspective'].map((camera) => (
+                    <button
+                      key={camera}
+                      onClick={() => {
+                        const newNote = projectData.contextNote.includes(camera)
+                          ? projectData.contextNote.replace(camera + ', ', '').replace(camera, '')
+                          : (projectData.contextNote ? projectData.contextNote + ', ' : '') + camera;
+                        updateProject({ contextNote: newNote.replace(/^,\s*/, '').replace(/,\s*$/, '') });
+                      }}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all border ${
+                        projectData.contextNote.includes(camera)
+                          ? 'bg-blue-600/30 border-blue-500 text-blue-300'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:border-zinc-700'
+                      }`}
+                    >
+                      {camera}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Color Palette */}
+              <div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <SwatchIcon className="w-3 h-3 text-amber-400" />
+                  <span className="text-[10px] text-amber-400 uppercase font-bold tracking-wider">Color Palette</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {['Warm Golden Tones', 'Cool Blue Hues', 'Desaturated/Muted', 'High Contrast B&W', 'Vibrant Saturated', 'Sepia Vintage', 'Neon & Electric', 'Earth Tones'].map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => {
+                        const newNote = projectData.contextNote.includes(color)
+                          ? projectData.contextNote.replace(color + ', ', '').replace(color, '')
+                          : (projectData.contextNote ? projectData.contextNote + ', ' : '') + color;
+                        updateProject({ contextNote: newNote.replace(/^,\s*/, '').replace(/,\s*$/, '') });
+                      }}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all border ${
+                        projectData.contextNote.includes(color)
+                          ? 'bg-amber-600/30 border-amber-500 text-amber-300'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:border-zinc-700'
+                      }`}
+                    >
+                      {color}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Lighting */}
+              <div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <SunIcon className="w-3 h-3 text-yellow-400" />
+                  <span className="text-[10px] text-yellow-400 uppercase font-bold tracking-wider">Lighting</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {['Golden Hour', 'Dramatic Chiaroscuro', 'Soft Diffused', 'Harsh Direct', 'Candlelit/Firelight', 'Neon Glow', 'Natural Daylight', 'Moonlit Night'].map((light) => (
+                    <button
+                      key={light}
+                      onClick={() => {
+                        const newNote = projectData.contextNote.includes(light)
+                          ? projectData.contextNote.replace(light + ', ', '').replace(light, '')
+                          : (projectData.contextNote ? projectData.contextNote + ', ' : '') + light;
+                        updateProject({ contextNote: newNote.replace(/^,\s*/, '').replace(/,\s*$/, '') });
+                      }}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all border ${
+                        projectData.contextNote.includes(light)
+                          ? 'bg-yellow-600/30 border-yellow-500 text-yellow-300'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:border-zinc-700'
+                      }`}
+                    >
+                      {light}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Selected Tags Display + Custom Note */}
+            {projectData.contextNote && (
+              <div className="bg-zinc-950/50 rounded-lg p-3 border border-zinc-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold">Selected Style Notes</span>
+                  <button
+                    onClick={() => updateProject({ contextNote: '' })}
+                    className="text-zinc-600 hover:text-zinc-400 transition-colors"
+                    title="Clear all"
+                  >
+                    <XMarkIcon className="w-3 h-3" />
+                  </button>
+                </div>
+                <p className="text-xs text-zinc-300 leading-relaxed">{projectData.contextNote}</p>
+              </div>
+            )}
+
+            {/* Optional Custom Note */}
             <textarea 
-              className="w-full h-24 bg-zinc-900/30 border border-zinc-800 rounded-lg p-4 text-zinc-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none leading-relaxed transition-all placeholder:text-zinc-700 resize-none text-sm"
+              className="w-full h-16 bg-zinc-900/30 border border-zinc-800 rounded-lg p-3 text-zinc-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none leading-relaxed transition-all placeholder:text-zinc-700 resize-none text-sm"
               value={projectData.contextNote}
               onChange={(e) => updateProject({ contextNote: e.target.value })}
-              placeholder="Describe tone, camera style, color palette, or specific details for better AI guidance..."
+              placeholder="Add custom notes or refine selections above..."
+            />
+          </div>
+
+          {/* Negative Prompts Section */}
+          <div className="space-y-4">
+            <div className="flex justify-between">
+              <label className="text-xs font-medium text-red-400 uppercase tracking-wide">Negative Prompts (Avoid)</label>
+              <span className="text-[10px] text-zinc-600">CLICK TO ADD</span>
+            </div>
+            
+            {/* Common Negative Prompt Tags */}
+            <div className="flex flex-wrap gap-2">
+              {['text', 'watermarks', 'logos', 'titles', 'subtitles', 'captions', 'words', 'letters', 'UI elements', 'low quality', 'blurry', 'distorted faces', 'extra limbs', 'bad anatomy', 'deformed', 'ugly', 'duplicate', 'cropped', 'out of frame', 'signature', 'username'].map((neg) => (
+                <button
+                  key={neg}
+                  onClick={() => {
+                    const currentNegatives = projectData.negativePrompt || '';
+                    const newNeg = currentNegatives.includes(neg)
+                      ? currentNegatives.replace(neg + ', ', '').replace(', ' + neg, '').replace(neg, '')
+                      : (currentNegatives ? currentNegatives + ', ' : '') + neg;
+                    updateProject({ negativePrompt: newNeg.replace(/^,\s*/, '').replace(/,\s*$/, '').replace(/,\s*,/g, ', ') });
+                  }}
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all border ${
+                    (projectData.negativePrompt || '').includes(neg)
+                      ? 'bg-red-900/30 border-red-700 text-red-300'
+                      : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  {neg}
+                </button>
+              ))}
+            </div>
+
+            {/* Current Negative Prompt Display */}
+            {projectData.negativePrompt && (
+              <div className="bg-red-950/20 rounded-lg p-3 border border-red-900/30">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-red-400 uppercase font-bold">Things to Avoid</span>
+                  <button
+                    onClick={() => updateProject({ negativePrompt: '' })}
+                    className="text-red-600 hover:text-red-400 transition-colors"
+                    title="Clear all"
+                  >
+                    <XMarkIcon className="w-3 h-3" />
+                  </button>
+                </div>
+                <p className="text-xs text-red-300/80 leading-relaxed">{projectData.negativePrompt}</p>
+              </div>
+            )}
+
+            {/* Custom Negative Prompt Input */}
+            <textarea 
+              className="w-full h-12 bg-zinc-900/30 border border-zinc-800 rounded-lg p-3 text-zinc-300 focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none leading-relaxed transition-all placeholder:text-zinc-700 resize-none text-sm"
+              value={projectData.negativePrompt || ''}
+              onChange={(e) => updateProject({ negativePrompt: e.target.value })}
+              placeholder="Add custom things to avoid in generation..."
             />
           </div>
 

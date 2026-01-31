@@ -43,7 +43,12 @@ const CharacterLibrary: React.FC<Props> = ({ projectData, updateProject, onNext 
   const handleGenerateImage = async (character: Character) => {
     setGeneratingId(character.id);
     try {
-      const base64Image = await generateCharacterReference(character, projectData.setting.landscape, projectData.style);
+      const base64Image = await generateCharacterReference(
+        character, 
+        projectData.setting.landscape, 
+        projectData.style,
+        projectData.category
+      );
       
       const updatedChars = projectData.characters.map(c => 
         c.id === character.id ? { ...c, referenceImageUrl: base64Image } : c
@@ -132,6 +137,24 @@ const CharacterLibrary: React.FC<Props> = ({ projectData, updateProject, onNext 
            char.role !== libChar.role;
   };
 
+  // Check how many characters have reference images
+  const charsWithRefs = projectData.characters.filter(c => c.referenceImageUrl).length;
+  const totalChars = projectData.characters.length;
+  const allHaveRefs = charsWithRefs === totalChars && totalChars > 0;
+
+  const handleProceed = () => {
+    if (totalChars > 0 && charsWithRefs === 0) {
+      if (!confirm('⚠️ No character reference images generated!\n\nGenerating casting assets is HIGHLY RECOMMENDED for visual consistency in the storyboard.\n\nProceed anyway?')) {
+        return;
+      }
+    } else if (totalChars > 0 && charsWithRefs < totalChars) {
+      if (!confirm(`⚠️ Only ${charsWithRefs}/${totalChars} characters have reference images.\n\nFor best visual consistency, generate images for all characters.\n\nProceed anyway?`)) {
+        return;
+      }
+    }
+    onNext();
+  };
+
   return (
     <div className="space-y-8 animate-fade-in relative">
       <div className="flex justify-between items-end border-b border-neutral-200 dark:border-zinc-800 pb-6">
@@ -141,6 +164,18 @@ const CharacterLibrary: React.FC<Props> = ({ projectData, updateProject, onNext 
           <p className="text-neutral-600 dark:text-zinc-400 mt-2 text-sm">
             {isExternal ? 'Review and copy character prompts for external generation.' : 'Generate consistent character references.'}
           </p>
+          {!isExternal && totalChars > 0 && (
+            <div className={`mt-3 px-3 py-2 rounded-lg text-xs font-medium border ${
+              allHaveRefs 
+                ? 'bg-emerald-900/20 border-emerald-700 text-emerald-400'
+                : 'bg-amber-900/20 border-amber-700 text-amber-400'
+            }`}>
+              {allHaveRefs 
+                ? `✓ All ${totalChars} characters have reference images - Ready for Storyboard`
+                : `⚠ ${charsWithRefs}/${totalChars} characters have reference images - Generate images for visual consistency`
+              }
+            </div>
+          )}
         </div>
         <div className="flex space-x-3">
           <button 
@@ -151,7 +186,7 @@ const CharacterLibrary: React.FC<Props> = ({ projectData, updateProject, onNext 
             <span>Open Library</span>
           </button>
           <button 
-            onClick={onNext}
+            onClick={handleProceed}
             className="flex items-center space-x-2 bg-zinc-100 hover:bg-white text-zinc-900 px-6 py-2 rounded-lg font-medium transition-colors text-sm"
           >
             <span>Confirm Cast</span> <ArrowRightIcon className="w-4 h-4" />
