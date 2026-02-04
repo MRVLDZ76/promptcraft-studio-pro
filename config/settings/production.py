@@ -51,9 +51,39 @@ if SENTRY_DSN:
 # Production email backend
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
-# Logging - Less verbose in production
-LOGGING['root']['level'] = 'WARNING'
-LOGGING['loggers']['apps']['level'] = 'INFO'
+# Logging - Console only in production (container environment)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
 
 # Admin URL (obscure in production)
 ADMIN_URL = config('ADMIN_URL', default='admin/')
