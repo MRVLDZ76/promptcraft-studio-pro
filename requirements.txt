@@ -1,0 +1,4 @@
+# This requirements.txt is for Appliku deployment
+# It references the actual requirements in backend/
+
+-r backend/requirements.txt
