@@ -2,8 +2,8 @@
 # Root-level config for monorepo deployment
 
 build_settings:
-  dockerfile: backend/Dockerfile
-  build_context: backend
+  build_image: python-3.11
+  root_dir: backend
   environment_variables:
     - name: "DJANGO_DEBUG"
       value: "False"
