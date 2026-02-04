@@ -1,5 +1,5 @@
 build_settings:
-  build_image: python-3.11
+  dockerfile: Dockerfile
   environment_variables:
     - name: "DJANGO_DEBUG"
       value: "False"

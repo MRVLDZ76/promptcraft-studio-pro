@@ -1,0 +1,20 @@
+{
+  "name": "Publishing Studio",
+  "version": "1.0.0",
+  "description": "AI-powered multi-modal book creation platform",
+  "icon": "📚",
+  "features": [
+    "Multi-format book generation (PDF, EPUB, HTML, Audiobook)",
+    "5 AI processing modes (Preserve to Reimagine)",
+    "Block-based content editing",
+    "Image generation with character consistency",
+    "TTS audio narration",
+    "Real-time progress tracking",
+    "Export management"
+  ],
+  "routes": {
+    "main": "/publishing",
+    "create": "/publishing/create",
+    "edit": "/publishing/edit/:id"
+  }
+}

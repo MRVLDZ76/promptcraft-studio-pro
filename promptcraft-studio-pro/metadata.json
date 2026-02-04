@@ -1,0 +1,9 @@
+
+{
+  "name": "PromptCraft Studio Pro v4",
+  "description": "A world-class prompt engineering suite with Veo 3 Video, Gemini TTS, and Nano Banana Image Editing.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

@@ -1,0 +1,66 @@
+# Appliku Deployment Configuration - PromptCraft Studio Pro Frontend
+# Domain: studio.ppall.io
+# This is a React + Vite SPA that consumes the Django backend API
+
+build_settings:
+  build_image: node-22
+  environment_variables:
+    # Backend API Configuration
+    - name: "VITE_API_URL"
+      value: "https://bcknd.ppall.io"
+    - name: "VITE_API_BASE_URL"
+      value: "https://bcknd.ppall.io/api/v1"
+    - name: "VITE_BACKEND_URL"
+      value: "https://bcknd.ppall.io"
+    
+    # Supabase Configuration (for data persistence)
+    - name: "VITE_SUPABASE_URL"
+      value: "https://uuohwxcuqnaykpjhrcvu.supabase.co"
+    - name: "VITE_SUPABASE_ANON_KEY"
+      value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV1b2h3eGN1cW5heWtwamhyY3Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMDc1OTQsImV4cCI6MjA4Mzc4MzU5NH0.UQWnRudvver0K7aWtFxdJQCjLf22JnLW3t2ETa9BHVg"
+    
+    # OpenAI API (for client-side AI features)
+    - name: "VITE_OPENAI_API_KEY"
+      value: "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"
+    
+    # Gemini API (for AI Arbiter system)
+    - name: "VITE_GEMINI_API_KEY"
+      value: "AIzaSyCY3udTgn0702PvBSGsgZgZOG-JBbr9Ph8"
+    
+    # Stripe Configuration (for subscriptions)
+    - name: "VITE_STRIPE_PUBLISHABLE_KEY"
+      value: "pk_live_YOUR_STRIPE_PUBLISHABLE_KEY_HERE"
+    
+    # Application Settings
+    - name: "VITE_APP_NAME"
+      value: "PromptCraft Studio Pro"
+    - name: "VITE_APP_URL"
+      value: "https://studio.ppall.io"
+    - name: "VITE_APP_DOMAIN"
+      value: "ppall.io"
+    
+    # Environment
+    - name: "NODE_ENV"
+      value: "production"
+    - name: "VITE_ENV"
+      value: "production"
+    
+    # Build Configuration
+    - name: "VITE_BUILD_MODE"
+      value: "production"
+    - name: "VITE_SOURCEMAP"
+      value: "false"
+
+services:
+  # Build step: Install dependencies and build static files
+  release:
+    command: "npm install && npm run build"
+  
+  # Serve static files using Node.js static server
+  web:
+    scale: 1
+    command: "npx serve -s dist -l 8080 --single"
+    # Alternative using http-server:
+    # command: "npx http-server dist -p 8080 -c-1 --proxy https://studio.ppall.io?"
+
+# No databases needed for frontend (uses backend API and Supabase)
