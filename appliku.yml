@@ -3,7 +3,7 @@
 
 build_settings:
   build_image: python-3.11
-  root_dir: backend
+  pre_build_script: "./appliku_pre_build.sh"
   environment_variables:
     - name: "DJANGO_DEBUG"
       value: "False"
