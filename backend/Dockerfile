@@ -1,5 +1,6 @@
 FROM python:3.11.9-bullseye
 
+# Build timestamp: 2026-02-04-v2
 # Install system dependencies
 RUN apt-get update && apt-get install -y --force-yes \
     nano \
