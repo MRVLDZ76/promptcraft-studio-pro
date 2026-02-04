@@ -19,6 +19,9 @@ python-dateutil==2.8.2
 pytz==2024.1
 pillow==10.2.0
 
+# Static Files
+whitenoise==6.8.2
+
 # Development
 django-debug-toolbar==4.3.0
 django-extensions==3.2.3

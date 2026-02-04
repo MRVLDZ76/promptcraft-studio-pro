@@ -22,9 +22,9 @@ SECURE_HSTS_PRELOAD = True
 # Database connection pooling
 DATABASES['default']['CONN_MAX_AGE'] = 600
 
-# Static files - Use S3 or similar in production
-# STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-# DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+# Static files - WhiteNoise will serve them through Gunicorn
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+WHITENOISE_COMPRESSION_OFFLINE = True
 
 # AWS S3 Settings (if using)
 # AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
