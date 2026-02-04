@@ -1,0 +1,250 @@
+build_settings:
+  build_image: python-3.11
+  environment_variables:
+    - name: "DJANGO_DEBUG"
+      value: "False"
+    - name: "DJANGO_SETTINGS_MODULE"
+      value: "config.settings.production"
+    - name: "DJANGO_SECRET_KEY"
+      value: "FKG2T6pv4dAD5HLypZRK2Il9RaaDvFCnpHTmxf5rbcDt0UtOZam6JQQJ99BHACYeBjFXJ3w3AAALACOGhbOW"
+    - name: "DJANGO_ADMIN_URL"
+      value: "admin/"
+    - name: "DJANGO_ALLOWED_HOSTS"
+      value: "bcknd.ppall.io,backend.ppall.io,ppall.io,www.ppall.io,studio.ppall.io"
+    - name: "COOKIE_DOMAIN"
+      value: ".ppall.io"
+    - name: "SESSION_COOKIE_SECURE"
+      value: "True"
+    - name: "CSRF_COOKIE_SECURE"
+      value: "True"
+    
+    # Database Configuration
+    - name: "DATABASE_URL"
+      from_database:
+        name: "studio"
+        property: "connection_url"
+    - name: "DATABASES_DEFAULT_CONN_MAX_AGE"
+      value: "60"
+    - name: "DB_CONN_MAX_AGE"
+      value: "60"
+    - name: "DB_ENGINE"
+      value: "django.db.backends.postgresql"
+    - name: "CACHES_DEFAULT_TIMEOUT"
+      value: "300"
+    
+    # DigitalOcean Spaces Storage (S3-compatible)
+    - name: "AWS_ACCESS_KEY_ID"
+      value: "DO0068PFRJ43NZQJT7Z7"
+    - name: "AWS_SECRET_ACCESS_KEY"
+      value: "WxrhMHTTl72PfEbhkPhY/xYDgDEi4GlUxXh7cyq6KVE"
+    - name: "AWS_STORAGE_BUCKET_NAME"
+      value: "businessesppall"
+    - name: "AWS_S3_REGION_NAME"
+      value: "nyc3"
+    - name: "AWS_S3_ENDPOINT_URL"
+      value: "https://nyc3.digitaloceanspaces.com"
+    - name: "AWS_S3_CUSTOM_DOMAIN"
+      value: "businessesppall.nyc3.cdn.digitaloceanspaces.com"
+    - name: "AWS_LOCATION"
+      value: "studio/media"
+    - name: "AWS_QUERYSTRING_AUTH"
+      value: "False"
+    - name: "AWS_DEFAULT_ACL"
+      value: "public-read"
+    - name: "AWS_S3_FILE_OVERWRITE"
+      value: "False"
+    - name: "AWS_S3_OBJECT_PARAMETERS"
+      value: "{\"CacheControl\": \"max-age=86400\", \"ContentDisposition\": \"inline\", \"ACL\": \"public-read\"}"
+    
+    # Django Storage Settings
+    - name: "DJANGO_AWS_ACCESS_KEY_ID"
+      value: "DO0068PFRJ43NZQJT7Z7"
+    - name: "DJANGO_AWS_SECRET_ACCESS_KEY"
+      value: "WxrhMHTTl72PfEbhkPhY/xYDgDEi4GlUxXh7cyq6KVE"
+    - name: "DJANGO_AWS_STORAGE_BUCKET_NAME"
+      value: "businessesppall"
+    - name: "DJANGO_AWS_S3_REGION_NAME"
+      value: "nyc3"
+    - name: "DJANGO_AWS_S3_ENDPOINT_URL"
+      value: "https://nyc3.digitaloceanspaces.com"
+    - name: "DJANGO_AWS_S3_CUSTOM_DOMAIN"
+      value: "businessesppall.nyc3.cdn.digitaloceanspaces.com"
+    - name: "DJANGO_SECURE_SSL_REDIRECT"
+      value: "True"
+    - name: "DJANGO_SECURE_PROXY_SSL_HEADER"
+      value: "HTTP_X_FORWARDED_PROTO,https"
+    - name: "DJANGO_USE_X_FORWARDED_HOST"
+      value: "True"
+    - name: "DJANGO_USE_X_FORWARDED_PORT"
+      value: "True"
+    - name: "DEFAULT_FILE_STORAGE"
+      value: "storages.backends.s3boto3.S3Boto3Storage"
+    - name: "STATIC_URL"
+      value: "/static/"
+    - name: "MEDIA_URL"
+      value: "https://businessesppall.nyc3.cdn.digitaloceanspaces.com/studio/"
+    - name: "STATIC_ROOT"
+      value: "static"
+    
+    # AI API Keys
+    - name: "OPENAI_API_KEY"
+      value: "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"
+    - name: "GEMINI_API_KEY"
+      value: "AIzaSyCY3udTgn0702PvBSGsgZgZOG-JBbr9Ph8"
+    - name: "ANTHROPIC_API_KEY"
+      value: "YOUR_ANTHROPIC_API_KEY_HERE"
+    
+    # RAG System Configuration
+    - name: "EMBEDDING_PROVIDER"
+      value: "openai"
+    - name: "VECTOR_SIMILARITY_THRESHOLD"
+      value: "0.7"
+    - name: "MAX_SEARCH_RESULTS"
+      value: "5"
+    - name: "AUTO_SEARCH_ENABLED"
+      value: "true"
+    
+    # Tavily API for Web Search
+    - name: "TAVILY_API_KEY"
+      value: "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"
+    
+    # ChronStudio External API Keys
+    - name: "API_FOOTBALL_KEY"
+      value: "a2dc0a18634af3f0b17cd93e28d918b4"
+    - name: "SPORTS_DB_KEY"
+      value: "3"
+    - name: "NEWS_API_KEY"
+      value: "d7fe7d85-fc47-433d-93c1-3c8295b95433"
+    - name: "GNEWS_API_KEY"
+      value: "02a023cc965f968c5106c9e498b2b56a"
+    - name: "GENIUS_API_KEY"
+      value: "QsNskiXcAi962Nc0OV6W0BkrOBZyiknBWajG_9b3XwUvJw3FtYi40b7c5Z3nLVvE"
+    
+    # SerpAPI Key for YouTube Search
+    - name: "SERPAPI_KEY"
+      value: "8497ce60ccb34a61b7bb371343928ddf60dfa38ce0133f9810e06c7cf9f74cd8"
+    
+    # Supabase Configuration
+    - name: "SUPABASE_URL"
+      value: "https://uuohwxcuqnaykpjhrcvu.supabase.co"
+    - name: "SUPABASE_ANON_KEY"
+      value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV1b2h3eGN1cW5heWtwamhyY3Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMDc1OTQsImV4cCI6MjA4Mzc4MzU5NH0.UQWnRudvver0K7aWtFxdJQCjLf22JnLW3t2ETa9BHVg"
+    - name: "SUPABASE_SERVICE_ROLE_KEY"
+      value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV1b2h3eGN1cW5heWtwamhyY3Z1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODIwNzU5NCwiZXhwIjoyMDgzNzgzNTk0fQ.DMBfjq0UMWHZUPX3o-RKlh8GWRFMhRyTz-qwBukc0u4"
+    - name: "POSTGRES_URL"
+      value: "postgres://postgres.uuohwxcuqnaykpjhrcvu:qFA19ITwz8wOPl9w@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&supa=base-pooler.x"
+    
+    # Subscription Tier Limits
+    - name: "FREE_TIER_ANALYSIS_LIMIT"
+      value: "10"
+    - name: "PRO_TIER_ANALYSIS_LIMIT"
+      value: "500"
+    - name: "ENTERPRISE_TIER_ANALYSIS_LIMIT"
+      value: "99999"
+    
+    # Email Configuration (Mailgun)
+    - name: "MAILGUN_API_KEY"
+      value: "YOUR_MAILGUN_API_KEY_HERE"
+    - name: "MAILGUN_DOMAIN"
+      value: "ppall.io"
+    - name: "MAILGUN_FROM_EMAIL"
+      value: "studio <noreply@ppall.io>"
+    - name: "CONTACT_NOTIFICATION_EMAIL"
+      value: "support@ppall.io"
+    
+    # OAuth Configuration
+    - name: "GOOGLE_OAUTH_CLIENT_ID"
+      value: "YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com"
+    - name: "GOOGLE_OAUTH_CLIENT_SECRET"
+      value: "YOUR_GOOGLE_CLIENT_SECRET_HERE"
+    - name: "GOOGLE_OAUTH_REDIRECT_URI"
+      value: "https://bcknd.ppall.io/api/auth/google/callback/"
+    
+    # YouTube OAuth (for ChronStudio social media uploads)
+    - name: "YOUTUBE_CLIENT_ID"
+      value: "19480734916-c1kfa22i8hfasl5gqlfuhvlbhled9rat.apps.googleusercontent.com"
+    - name: "YOUTUBE_CLIENT_SECRET"
+      value: "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"
+    - name: "YOUTUBE_REDIRECT_URI"
+      value: "https://bcknd.ppall.io/api/v1/chronstudio/oauth/youtube/callback/"
+    
+    - name: "APPLE_CLIENT_ID"
+      value: "com.YOUR_APP_ID_HERE.app"
+    - name: "APPLE_TEAM_ID"
+      value: "YOUR_APPLE_TEAM_ID_HERE"
+    - name: "APPLE_KEY_ID"
+      value: "YOUR_APPLE_KEY_ID_HERE"
+    - name: "APPLE_PRIVATE_KEY"
+      value: |
+        -----BEGIN PRIVATE KEY-----
+        YOUR_APPLE_PRIVATE_KEY_CONTENT_HERE
+        -----END PRIVATE KEY-----
+    - name: "APPLE_REDIRECT_URI"
+      value: "https://bcknd.ppall.io/api/auth/apple/callback/"
+    
+    # Frontend URL (for OAuth redirects and CORS)
+    - name: "FRONTEND_URL"
+      value: "https://studio.ppall.io"
+    - name: "CORS_ALLOWED_ORIGINS"
+      value: "https://studio.ppall.io,https://ppall.io,https://www.ppall.io"
+    
+    # Stripe Configuration - PromptCraft Studio Pro Subscription Plans
+    - name: "STRIPE_PUBLISHABLE_KEY"
+      value: "pk_live_YOUR_STRIPE_PUBLISHABLE_KEY_HERE"
+    - name: "STRIPE_SECRET_KEY"
+      value: "sk_live_YOUR_STRIPE_SECRET_KEY_HERE"
+    - name: "STRIPE_WEBHOOK_SECRET"
+      value: "whsec_YOUR_STRIPE_WEBHOOK_SECRET_HERE"
+    
+    # PromptCraft Studio Pro Subscription Products
+    # Free Plan - No Stripe product needed (managed in Django)
+    - name: "STRIPE_PRODUCT_PRO"
+      value: "prod_Tuu1CDb48DJd9R"  # Pro Plan - $29.99/month
+    - name: "STRIPE_PRICE_PRO_MONTHLY"
+      value: "price_1Sx4DbCg2HPZisJTZvNtXzw7"  # Pro Plan Price
+    - name: "STRIPE_PRODUCT_ENTERPRISE"
+      value: "prod_Tuu2vFq1On3jfO"  # Enterprise Plan - $99.00/month
+    - name: "STRIPE_PRICE_ENTERPRISE_MONTHLY"
+      value: "price_1Sx4E7Cg2HPZisJT9GIBv8DX"  # Enterprise Plan Price
+    
+    # AI Credits (One-time purchases)
+    - name: "STRIPE_PRODUCT_CREDITS_10"
+      value: "prod_Tuu26QJJiWAdSg"  # 10 Credits - $9.99
+    - name: "STRIPE_PRICE_CREDITS_10"
+      value: "price_1Sx4EqCg2HPZisJT8fppHgfJ"
+    - name: "STRIPE_PRODUCT_CREDITS_50"
+      value: "prod_Tuu3yumCSwfMP8"  # 50 Credits - $29.99
+    - name: "STRIPE_PRICE_CREDITS_50"
+      value: "price_1Sx4FqCg2HPZisJT8cekNYrY"
+    
+    # Redis Configuration
+    - name: "REDIS_URL"
+      from_database:
+        name: "studio-redis"
+        property: "connection_url"
+    - name: "CELERY_BROKER_URL"
+      from_database:
+        name: "studio-redis"
+        property: "connection_url"
+
+services:
+  release:
+    command: "python manage.py migrate --noinput && python manage.py collectstatic --noinput --clear"
+  web:
+    scale: 1
+    command: "/code/start_server.sh"
+  worker:
+    scale: 1
+    command: "celery -A config.celery_app worker --loglevel=info --concurrency=4"
+  beat:
+    scale: 1
+    command: "celery -A config.celery_app beat --loglevel=info"
+  flower:
+    scale: 1
+    command: "celery -A config.celery_app flower --port=5555"
+
+databases:
+  studio:
+    type: postgresql_16
+  studio-redis:
+    type: redis_7

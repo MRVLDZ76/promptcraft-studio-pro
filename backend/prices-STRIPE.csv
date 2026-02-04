@@ -1,0 +1,5 @@
+Price ID,Product ID,Product Name,Product Statement Descriptor,Product Tax Code,Description,Created (UTC),Amount,Currency,Interval,Interval Count,Usage Type,Aggregate Usage,Billing Scheme,Trial Period Days,Tax Behavior
+price_1Sx4FqCg2HPZisJT8cekNYrY,prod_Tuu3yumCSwfMP8,STRIPE_PRODUCT_CREDITS_50,,txcd_10000000,,2026-02-04 11:28,29.99,usd,,,,,per_unit,,unspecified
+price_1Sx4EqCg2HPZisJT8fppHgfJ,prod_Tuu26QJJiWAdSg,STRIPE_PRODUCT_CREDITS_10,,txcd_10000000,,2026-02-04 11:27,9.99,usd,,,,,per_unit,,unspecified
+price_1Sx4E7Cg2HPZisJT9GIBv8DX,prod_Tuu2vFq1On3jfO,STRIPE_PRODUCT_ENTERPRISE,,txcd_10000000,,2026-02-04 11:26,99.00,usd,month,1,licensed,,per_unit,,unspecified
+price_1Sx4DbCg2HPZisJTZvNtXzw7,prod_Tuu1CDb48DJd9R,STRIPE_PRODUCT_PRO,,txcd_10000000,,2026-02-04 11:25,29.99,usd,month,1,licensed,,per_unit,,unspecified
