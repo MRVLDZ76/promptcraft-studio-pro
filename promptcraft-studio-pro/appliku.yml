@@ -3,7 +3,7 @@
 # This is a React + Vite SPA that consumes the Django backend API
 
 build_settings:
-  build_image: node-22
+  build_image: node-20-npm
   environment_variables:
     # Backend API Configuration
     - name: "VITE_API_URL"
